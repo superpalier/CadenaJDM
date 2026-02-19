@@ -2,8 +2,10 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { GameState } from '../types';
 
-// Use same hostname as the browser so it works on both localhost and LAN
-const SERVER_URL = `http://${window.location.hostname}:3001`;
+// Locally: connect to port 3001. On Render: connect to same origin (Render handles the port)
+const SERVER_URL = window.location.hostname === 'localhost'
+    ? 'http://localhost:3001'
+    : window.location.origin;
 
 interface RoomPlayer {
     name: string;
