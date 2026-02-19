@@ -1,11 +1,11 @@
 import type { Card, CardType, GameState, Player, Preference } from '../types';
 
 // ===== BALANCE CONSTANTS =====
-const HAND_SIZE = 7;
+const HAND_SIZE = 5;
 const WIN_SCORE = 100;
 const OBJECTIVE_BONUS = 3;
 const DRAW_ON_PLAY = 1;
-const DRAW_ON_CLOSE = 3;
+const DRAW_ON_CLOSE = 2;
 
 export const createDeck = (): Card[] => {
     const cards: Card[] = [];
@@ -59,6 +59,41 @@ export const calculateComboScore = (combo: Card[], metObjective: boolean): numbe
     return baseScore + (metObjective ? OBJECTIVE_BONUS : 0);
 };
 
+// Reshuffle discard pile into deck when deck is empty
+const reshuffleDeck = (state: GameState): void => {
+    if (state.deck.length === 0 && state.discardPile.length > 0) {
+        state.deck = shuffle(state.discardPile);
+        state.discardPile = [];
+        state.log.push('♻️ ¡Mazo agotado! Se revolvió la pila de descarte.');
+    }
+};
+
+// Draw cards, reshuffling discard pile if needed
+const drawCards = (player: Player, state: GameState, count: number): void => {
+    for (let i = 0; i < count; i++) {
+        reshuffleDeck(state);
+        if (state.deck.length > 0) {
+            const drawn = state.deck.shift();
+            if (drawn) player.hand.push(drawn);
+        }
+    }
+};
+
+// Check if player must discard (hand > HAND_SIZE)
+const checkMustDiscard = (state: GameState): void => {
+    const currentPlayer = state.players[state.currentPlayerIndex];
+    state.mustDiscard = currentPlayer.hand.length > HAND_SIZE;
+};
+
+// Start new round: reset combo, rotate objectives
+const advanceRound = (state: GameState): void => {
+    state.log.push('🔄 ¡Nueva ronda! Objetivo cambia para todos.');
+    state.communityCombo = [];
+    state.players.forEach(player => {
+        player.preference = PREFERENCES[Math.floor(Math.random() * PREFERENCES.length)];
+    });
+};
+
 export const initializeGame = (humanName: string = "Player 1", playerCount: number = 2): GameState => {
     const deck = createDeck();
     const aiNames = ["Rojo", "Azul", "Verde", "Morado"];
@@ -88,6 +123,7 @@ export const initializeGame = (humanName: string = "Player 1", playerCount: numb
 
     return {
         deck,
+        discardPile: [],
         players,
         currentPlayerIndex: Math.floor(Math.random() * playerCount),
         winner: null,
@@ -95,30 +131,8 @@ export const initializeGame = (humanName: string = "Player 1", playerCount: numb
         tutorialStep: 'WELCOME',
         isTutorialActive: true,
         communityCombo: [],
-        roundPhase: 'playing',
-        roundCloserId: null,
-        playersToFinish: []
+        mustDiscard: false,
     };
-};
-
-const advanceRound = (state: GameState): void => {
-    state.log.push('🔄 ¡Nueva ronda! Objetivo cambia para todos.');
-    state.communityCombo = [];
-    state.players.forEach(player => {
-        player.preference = PREFERENCES[Math.floor(Math.random() * PREFERENCES.length)];
-    });
-    state.roundPhase = 'playing';
-    state.roundCloserId = null;
-    state.playersToFinish = [];
-};
-
-const drawCards = (player: Player, deck: Card[], count: number): void => {
-    for (let i = 0; i < count; i++) {
-        if (deck.length > 0) {
-            const drawn = deck.shift();
-            if (drawn) player.hand.push(drawn);
-        }
-    }
 };
 
 export const playCard = (state: GameState, cardIndex: number): GameState => {
@@ -134,9 +148,9 @@ export const playCard = (state: GameState, cardIndex: number): GameState => {
             closedChains: [...p.closedChains]
         })),
         deck: [...state.deck],
+        discardPile: [...state.discardPile],
         log: [...state.log],
         communityCombo: [...state.communityCombo],
-        playersToFinish: [...state.playersToFinish]
     };
     const playerIndex = state.currentPlayerIndex;
     const newPlayer = newState.players[playerIndex];
@@ -157,14 +171,14 @@ export const playCard = (state: GameState, cardIndex: number): GameState => {
 
         newPlayer.score += points;
         newPlayer.closedChains.push(combo);
-        newState.communityCombo = [];
 
-        newState.log.push(`🏆 ${currentPlayer.name} cerró el combo comunitario (${combo.length} cartas) = ${points} pts!`);
+        newState.log.push(`🏆 ${currentPlayer.name} cerró el combo (${combo.length} cartas) = ${points} pts!`);
         if (metObjective) {
             newState.log.push(`✨ ¡Bonus objetivo: +${OBJECTIVE_BONUS} pts!`);
         }
 
-        drawCards(newPlayer, newState.deck, DRAW_ON_CLOSE);
+        // Draw cards for closing
+        drawCards(newPlayer, newState, DRAW_ON_CLOSE);
 
         if (newPlayer.score >= WIN_SCORE) {
             newState.winner = currentPlayer.id;
@@ -172,31 +186,54 @@ export const playCard = (state: GameState, cardIndex: number): GameState => {
             return newState;
         }
 
-        // Trigger round closing: others get 1 turn then objectives change
-        if (newState.roundPhase === 'playing') {
-            newState.roundPhase = 'closing';
-            newState.roundCloserId = currentPlayer.id;
-            newState.playersToFinish = newState.players
-                .filter(p => p.id !== currentPlayer.id)
-                .map(p => p.id);
-            newState.log.push(`⏰ Los demás tienen 1 turno antes de nueva ronda.`);
-        }
+        // COMBO CLOSE = IMMEDIATE NEW ROUND
+        advanceRound(newState);
     } else {
         // ADD TO COMMUNITY COMBO (START or EXTENSION)
         newState.communityCombo.push(card);
-        newState.log.push(`${currentPlayer.name} +${card.type}(${card.value}) → combo comunitario: ${newState.communityCombo.length} cartas`);
-        drawCards(newPlayer, newState.deck, DRAW_ON_PLAY);
+        newState.log.push(`${currentPlayer.name} +${card.type}(${card.value}) → combo: ${newState.communityCombo.length} cartas`);
+        drawCards(newPlayer, newState, DRAW_ON_PLAY);
     }
 
-    // Track round closing
-    if (newState.roundPhase === 'closing') {
-        newState.playersToFinish = newState.playersToFinish.filter(id => id !== currentPlayer.id);
-        if (newState.playersToFinish.length === 0) {
-            advanceRound(newState);
-        }
+    // Check if player must discard before turn ends
+    checkMustDiscard(newState);
+
+    if (!newState.mustDiscard && !newState.winner) {
+        newState.currentPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
     }
 
-    if (!newState.winner) {
+    return newState;
+};
+
+// Discard a card from hand (when hand > HAND_SIZE)
+export const discardCard = (state: GameState, cardIndex: number): GameState => {
+    const currentPlayer = state.players[state.currentPlayerIndex];
+    if (!currentPlayer || currentPlayer.hand.length <= HAND_SIZE) return state;
+
+    const newState: GameState = {
+        ...state,
+        players: state.players.map(p => ({
+            ...p,
+            hand: [...p.hand],
+            closedChains: [...p.closedChains]
+        })),
+        deck: [...state.deck],
+        discardPile: [...state.discardPile],
+        log: [...state.log],
+        communityCombo: [...state.communityCombo],
+    };
+    const newPlayer = newState.players[state.currentPlayerIndex];
+    const card = newPlayer.hand.splice(cardIndex, 1)[0];
+    if (card) {
+        newState.discardPile.push(card);
+        newState.log.push(`🗑️ ${currentPlayer.name} descartó ${card.type}(${card.value})`);
+    }
+
+    // Check if still needs to discard more
+    checkMustDiscard(newState);
+
+    // If done discarding, advance turn
+    if (!newState.mustDiscard) {
         newState.currentPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
     }
 
@@ -212,44 +249,38 @@ export const passTurn = (state: GameState): GameState => {
             closedChains: [...p.closedChains]
         })),
         deck: [...state.deck],
+        discardPile: [...state.discardPile],
         log: [...state.log],
         communityCombo: [...state.communityCombo],
-        playersToFinish: [...state.playersToFinish]
     };
     const playerIndex = newState.currentPlayerIndex;
     const currentPlayer = newState.players[playerIndex];
 
-    if (newState.deck.length > 0) {
-        const drawn = newState.deck.shift();
-        if (drawn) {
-            currentPlayer.hand.push(drawn);
-            newState.log.push(`${currentPlayer.name} pasó y robó 1 carta.`);
+    // Draw 1 card when passing
+    drawCards(currentPlayer, newState, 1);
+    newState.log.push(`${currentPlayer.name} pasó y robó 1 carta.`);
+
+    // Check if must discard
+    checkMustDiscard(newState);
+
+    if (!newState.mustDiscard) {
+        // Check stalemate: if deck AND discard pile empty and nobody can play
+        if (newState.deck.length === 0 && newState.discardPile.length === 0) {
+            const allStuck = newState.players.every(player =>
+                !player.hand.some(card => isValidMove(newState.communityCombo, card))
+            );
+            if (allStuck) {
+                const sorted = [...newState.players].sort((a, b) => b.score - a.score);
+                newState.winner = sorted[0].id;
+                newState.log.push(`🏁 ¡No quedan cartas! ${sorted[0].name} gana con ${sorted[0].score} pts!`);
+                return newState;
+            }
         }
-    } else {
-        newState.log.push(`${currentPlayer.name} pasó (mazo vacío).`);
+
+        newState.currentPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
     }
 
-    if (newState.roundPhase === 'closing') {
-        newState.playersToFinish = newState.playersToFinish.filter(id => id !== currentPlayer.id);
-        if (newState.playersToFinish.length === 0) {
-            advanceRound(newState);
-        }
-    }
-
-    if (newState.deck.length === 0) {
-        const allStuck = newState.players.every(player =>
-            !player.hand.some(card => isValidMove(newState.communityCombo, card))
-        );
-        if (allStuck) {
-            const sorted = [...newState.players].sort((a, b) => b.score - a.score);
-            newState.winner = sorted[0].id;
-            newState.log.push(`🏁 ¡Mazo agotado! ${sorted[0].name} gana con ${sorted[0].score} pts!`);
-            return newState;
-        }
-    }
-
-    newState.currentPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
     return newState;
 };
 
-export { WIN_SCORE };
+export { WIN_SCORE, HAND_SIZE };

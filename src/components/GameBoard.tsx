@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { GameState, TutorialStep } from '../types';
-import { initializeGame, playCard, passTurn, isValidMove, calculateComboScore, WIN_SCORE, PREFERENCES } from '../logic/gameEngine';
+import { initializeGame, playCard, passTurn, discardCard, isValidMove, calculateComboScore, WIN_SCORE, HAND_SIZE, PREFERENCES } from '../logic/gameEngine';
 import { calculateBestMove } from '../logic/ai';
 import type { AIDifficulty } from '../logic/ai';
 import Card from './Card';
@@ -39,6 +39,13 @@ const GameBoard: React.FC<GameBoardProps> = ({
         const cp = gameState.players[gameState.currentPlayerIndex];
         if (cp.isAI) {
             const timer = setTimeout(() => {
+                // AI must discard first if hand > HAND_SIZE
+                if (gameState.mustDiscard && cp.hand.length > HAND_SIZE) {
+                    // AI discards lowest value non-strategic card
+                    const worst = cp.hand.reduce((best, c, i) => c.value < cp.hand[best].value ? i : best, 0);
+                    setLocalState(prev => prev ? discardCard(prev, worst) : null);
+                    return;
+                }
                 const moveIndex = calculateBestMove(gameState, difficulty);
                 if (moveIndex !== null && moveIndex !== -1) {
                     setLocalState(prev => prev ? playCard(prev, moveIndex) : null);
@@ -72,7 +79,15 @@ const GameBoard: React.FC<GameBoardProps> = ({
         if (!gameState) return;
         if (mode === 'online') { onPlayCard?.(index); return; }
         const myPlayer = gameState.players.find(p => !p.isAI)!;
-        if (gameState.currentPlayerIndex !== gameState.players.indexOf(myPlayer)) return;
+        const myIdx = gameState.players.indexOf(myPlayer);
+        if (gameState.currentPlayerIndex !== myIdx) return;
+
+        // If must discard, clicking a card discards it
+        if (gameState.mustDiscard) {
+            setLocalState(prev => prev ? discardCard(prev, index) : null);
+            return;
+        }
+
         setLocalState(prev => prev ? playCard(prev, index) : null);
     };
 
@@ -153,14 +168,14 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 {/* LEFT: Info */}
                 <div style={{ width: '190px', flexShrink: 0, padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', borderRight: '1px solid rgba(255,255,255,0.1)', overflowY: 'auto' }}>
                     <div style={{ background: 'rgba(0,0,0,0.5)', padding: '8px', borderRadius: '8px', fontSize: '12px', fontFamily: 'monospace' }}>
-                        <div>Mazo: {gameState.deck.length}</div>
+                        <div>Mazo: {gameState.deck.length} | Descarte: {gameState.discardPile?.length ?? 0}</div>
                         <div style={{ color: isMyTurn ? '#FFD700' : '#999', fontWeight: 'bold', marginTop: '4px' }}>
-                            {isMyTurn ? '🎴 TU TURNO' : `⏳ ${currentTurnPlayer.name}...`}
+                            {isMyTurn && gameState.mustDiscard ? '🗑️ DESCARTA' : isMyTurn ? '🎴 TU TURNO' : `⏳ ${currentTurnPlayer.name}...`}
                         </div>
                         {mode === 'online' && <div style={{ fontSize: '10px', color: '#4CAF50', marginTop: '4px' }}>🌐 Online</div>}
-                        {gameState.roundPhase === 'closing' && (
+                        {isMyTurn && gameState.mustDiscard && (
                             <div style={{ marginTop: '6px', padding: '4px', background: 'rgba(255,152,0,0.3)', border: '1px solid #FF9800', borderRadius: '4px', fontSize: '10px', textAlign: 'center', color: '#FFB74D', fontWeight: 'bold' }}>
-                                ⏰ CERRANDO RONDA ({gameState.playersToFinish.length} restante{gameState.playersToFinish.length !== 1 ? 's' : ''})
+                                Elegí una carta para descartar (máx {HAND_SIZE} en mano)
                             </div>
                         )}
                     </div>

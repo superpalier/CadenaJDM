@@ -21,11 +21,11 @@ app.get('/{*path}', (req, res) => {
 
 // ===== GAME LOGIC (server-side, community combo) =====
 
-const HAND_SIZE = 7;
+const HAND_SIZE = 5;
 const WIN_SCORE = 100;
 const OBJECTIVE_BONUS = 3;
 const DRAW_ON_PLAY = 1;
-const DRAW_ON_CLOSE = 3;
+const DRAW_ON_CLOSE = 2;
 
 const PREFERENCES = [
     { id: 'p1', description: 'Combo de 3+ cartas', check: (chain) => chain.length >= 3 },
@@ -68,7 +68,6 @@ function randomPref() {
     return PREFERENCES[Math.floor(Math.random() * PREFERENCES.length)];
 }
 
-// Validate against COMMUNITY combo
 function isValidMove(combo, card) {
     if (combo.length === 0) return card.type === 'START';
     if (card.type === 'START') return false;
@@ -82,10 +81,24 @@ function calcComboScore(combo, metObjective) {
     return base + (metObjective ? OBJECTIVE_BONUS : 0);
 }
 
-function drawCards(player, deck, count) {
-    for (let i = 0; i < count; i++) {
-        if (deck.length > 0) player.hand.push(deck.shift());
+function reshuffleDeck(state) {
+    if (state.deck.length === 0 && state.discardPile.length > 0) {
+        state.deck = shuffle(state.discardPile);
+        state.discardPile = [];
+        state.log.push('♻️ ¡Mazo agotado! Se revolvió la pila de descarte.');
     }
+}
+
+function drawCards(player, state, count) {
+    for (let i = 0; i < count; i++) {
+        reshuffleDeck(state);
+        if (state.deck.length > 0) player.hand.push(state.deck.shift());
+    }
+}
+
+function checkMustDiscard(state) {
+    const cp = state.players[state.currentPlayerIndex];
+    state.mustDiscard = cp.hand.length > HAND_SIZE;
 }
 
 function advanceRound(state) {
@@ -95,9 +108,6 @@ function advanceRound(state) {
         const pref = randomPref();
         p.preference = { id: pref.id, description: pref.description };
     });
-    state.roundPhase = 'playing';
-    state.roundCloserId = null;
-    state.playersToFinish = [];
 }
 
 function playCard(state, cardIndex) {
@@ -109,41 +119,45 @@ function playCard(state, cardIndex) {
     cp.hand.splice(cardIndex, 1);
 
     if (card.type === 'END') {
-        // CLOSE the community combo — this player scores!
         const combo = [...state.communityCombo, card];
         const pref = PREFERENCES.find(p => p.id === cp.preference.id);
         const met = pref ? pref.check(combo) : false;
         const pts = calcComboScore(combo, met);
         cp.score += pts;
         cp.closedChains.push(combo);
-        state.communityCombo = [];
-        state.log.push(`🏆 ${cp.name} cerró el combo comunitario (${combo.length} cartas) = ${pts} pts!`);
+        state.log.push(`🏆 ${cp.name} cerró el combo (${combo.length} cartas) = ${pts} pts!`);
         if (met) state.log.push(`✨ ¡Bonus objetivo: +${OBJECTIVE_BONUS} pts!`);
-        drawCards(cp, state.deck, DRAW_ON_CLOSE);
+        drawCards(cp, state, DRAW_ON_CLOSE);
         if (cp.score >= WIN_SCORE) {
             state.winner = cp.id;
             state.log.push(`🏆 ¡${cp.name} GANA con ${cp.score} pts!`);
             return state;
         }
-        if (state.roundPhase === 'playing') {
-            state.roundPhase = 'closing';
-            state.roundCloserId = cp.id;
-            state.playersToFinish = state.players.filter(p => p.id !== cp.id).map(p => p.id);
-            state.log.push(`⏰ Los demás tienen 1 turno antes de nueva ronda.`);
-        }
+        // COMBO CLOSE = IMMEDIATE NEW ROUND
+        advanceRound(state);
     } else {
-        // ADD to community combo
         state.communityCombo.push(card);
-        state.log.push(`${cp.name} +${card.type}(${card.value}) → combo comunitario: ${state.communityCombo.length} cartas`);
-        drawCards(cp, state.deck, DRAW_ON_PLAY);
+        state.log.push(`${cp.name} +${card.type}(${card.value}) → combo: ${state.communityCombo.length} cartas`);
+        drawCards(cp, state, DRAW_ON_PLAY);
     }
 
-    if (state.roundPhase === 'closing') {
-        state.playersToFinish = state.playersToFinish.filter(id => id !== cp.id);
-        if (state.playersToFinish.length === 0) advanceRound(state);
+    checkMustDiscard(state);
+    if (!state.mustDiscard && !state.winner) {
+        state.currentPlayerIndex = (state.currentPlayerIndex + 1) % state.players.length;
     }
+    return state;
+}
 
-    if (!state.winner) {
+function discardCard(state, cardIndex) {
+    const cp = state.players[state.currentPlayerIndex];
+    if (!cp || cp.hand.length <= HAND_SIZE) return state;
+    const card = cp.hand.splice(cardIndex, 1)[0];
+    if (card) {
+        state.discardPile.push(card);
+        state.log.push(`🗑️ ${cp.name} descartó ${card.type}(${card.value})`);
+    }
+    checkMustDiscard(state);
+    if (!state.mustDiscard) {
         state.currentPlayerIndex = (state.currentPlayerIndex + 1) % state.players.length;
     }
     return state;
@@ -151,29 +165,22 @@ function playCard(state, cardIndex) {
 
 function passTurn(state) {
     const cp = state.players[state.currentPlayerIndex];
-    if (state.deck.length > 0) {
-        cp.hand.push(state.deck.shift());
-        state.log.push(`${cp.name} pasó y robó 1 carta.`);
-    } else {
-        state.log.push(`${cp.name} pasó (mazo vacío).`);
-    }
+    drawCards(cp, state, 1);
+    state.log.push(`${cp.name} pasó y robó 1 carta.`);
 
-    if (state.roundPhase === 'closing') {
-        state.playersToFinish = state.playersToFinish.filter(id => id !== cp.id);
-        if (state.playersToFinish.length === 0) advanceRound(state);
-    }
-
-    if (state.deck.length === 0) {
-        const allStuck = state.players.every(p => !p.hand.some(c => isValidMove(state.communityCombo, c)));
-        if (allStuck) {
-            const sorted = [...state.players].sort((a, b) => b.score - a.score);
-            state.winner = sorted[0].id;
-            state.log.push(`🏁 ¡Mazo agotado! ${sorted[0].name} gana con ${sorted[0].score} pts!`);
-            return state;
+    checkMustDiscard(state);
+    if (!state.mustDiscard) {
+        if (state.deck.length === 0 && state.discardPile.length === 0) {
+            const allStuck = state.players.every(p => !p.hand.some(c => isValidMove(state.communityCombo, c)));
+            if (allStuck) {
+                const sorted = [...state.players].sort((a, b) => b.score - a.score);
+                state.winner = sorted[0].id;
+                state.log.push(`🏁 ¡No quedan cartas! ${sorted[0].name} gana con ${sorted[0].score} pts!`);
+                return state;
+            }
         }
+        state.currentPlayerIndex = (state.currentPlayerIndex + 1) % state.players.length;
     }
-
-    state.currentPlayerIndex = (state.currentPlayerIndex + 1) % state.players.length;
     return state;
 }
 
@@ -193,7 +200,6 @@ function aiBestMove(state, difficulty = 'normal') {
         return valid[0].idx;
     }
 
-    // Check for win
     for (const { idx, card } of valid) {
         if (card.type === 'END') {
             const pc = [...combo, card];
@@ -295,14 +301,13 @@ function createGameState(room) {
 
     return {
         deck,
+        discardPile: [],
         players,
         currentPlayerIndex: Math.floor(Math.random() * players.length),
         winner: null,
         log: ['¡Juego iniciado!'],
         communityCombo: [],
-        roundPhase: 'playing',
-        roundCloserId: null,
-        playersToFinish: []
+        mustDiscard: false,
     };
 }
 
@@ -323,6 +328,15 @@ function runAITurns(room) {
     if (!cp.isAI) return;
 
     setTimeout(() => {
+        // AI must discard first if hand > HAND_SIZE
+        if (state.mustDiscard && cp.hand.length > HAND_SIZE) {
+            const worst = cp.hand.reduce((best, c, i) => c.value < cp.hand[best].value ? i : best, 0);
+            discardCard(state, worst);
+            broadcastState(room);
+            runAITurns(room);
+            return;
+        }
+
         const moveIdx = aiBestMove(state, room.difficulty || 'normal');
         if (moveIdx !== null && moveIdx >= 0) {
             playCard(state, moveIdx);
@@ -407,7 +421,13 @@ io.on('connection', (socket) => {
         if (!room || !room.state || room.state.winner) return;
         const cp = room.state.players[room.state.currentPlayerIndex];
         if (cp.id !== socket.playerId) return;
-        playCard(room.state, cardIndex);
+
+        // If must discard, treat play-card as discard
+        if (room.state.mustDiscard) {
+            discardCard(room.state, cardIndex);
+        } else {
+            playCard(room.state, cardIndex);
+        }
         broadcastState(room);
         runAITurns(room);
     });
@@ -417,6 +437,7 @@ io.on('connection', (socket) => {
         if (!room || !room.state || room.state.winner) return;
         const cp = room.state.players[room.state.currentPlayerIndex];
         if (cp.id !== socket.playerId) return;
+        if (room.state.mustDiscard) return; // Can't pass while must discard
         passTurn(room.state);
         broadcastState(room);
         runAITurns(room);

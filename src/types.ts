@@ -24,16 +24,15 @@ export interface Player {
 
 export interface GameState {
     deck: Card[];
+    discardPile: Card[];                    // Discard pile — reshuffled into deck when empty
     players: Player[];
     currentPlayerIndex: number;
     winner: string | null;
     log: string[];
     tutorialStep: TutorialStep;
     isTutorialActive: boolean;
-    communityCombo: Card[];                // Shared combo all players build on
-    roundPhase: 'playing' | 'closing';
-    roundCloserId: string | null;
-    playersToFinish: string[];
+    communityCombo: Card[];                 // Shared combo all players build on
+    mustDiscard: boolean;                   // True when current player must discard to get to 5 cards
 }
 
 export type TutorialStep =
