@@ -116,15 +116,17 @@ const GameBoard: React.FC<GameBoardProps> = ({
         setLocalState(prev => prev ? playCard(prev, index) : null);
     };
 
-    const handleWildcardDecision = (asCloser: boolean) => {
+    const handleWildcardDecision = (asCloser: boolean, val?: number) => {
         if (!wildcardChoice) return;
         const { index } = wildcardChoice;
         setWildcardChoice(null);
 
+        const options = { asCloser, wildcardValue: val };
+
         if (mode === 'online') {
-            onPlayCard?.(index, { asCloser });
+            onPlayCard?.(index, options);
         } else {
-            setLocalState(prev => prev ? playCard(prev, index, { asCloser }) : null);
+            setLocalState(prev => prev ? playCard(prev, index, options) : null);
         }
     };
 
@@ -178,26 +180,48 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 }}>
                     <div style={{
                         background: '#1a1a1a', padding: '20px', borderRadius: '12px',
-                        border: '2px solid #FFD700', textAlign: 'center', maxWidth: '300px'
+                        border: '2px solid #FFD700', textAlign: 'center', maxWidth: '320px'
                     }}>
                         <div style={{ fontSize: '40px', marginBottom: '10px' }}>🃏</div>
                         <h3 style={{ color: '#FFD700', marginBottom: '10px' }}>¿Cómo usar el Comodín?</h3>
                         <p style={{ fontSize: '12px', color: '#ccc', marginBottom: '20px' }}>
-                            Puedes usarlo para extender el combo (puente) o para cerrarlo si tienes los puntos.
+                            Extender como puente, o Cerrar eligiendo el valor para tu objetivo (debe ser ≥ carta anterior).
                         </p>
-                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                            <button onClick={() => handleWildcardDecision(false)} style={{
-                                padding: '10px 15px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', flex: 1
-                            }}>
-                                🔗 Extender
-                            </button>
-                            <button onClick={() => handleWildcardDecision(true)} style={{
-                                padding: '10px 15px', background: '#F44336', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', flex: 1, fontWeight: 'bold'
-                            }}>
-                                🛑 Cerrar
-                            </button>
+
+                        <button onClick={() => handleWildcardDecision(false)} style={{
+                            padding: '12px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', width: '100%', marginBottom: '12px', fontWeight: 'bold'
+                        }}>
+                            🔗 Extender (Puente)
+                        </button>
+
+                        <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '8px' }}>--- O CERRAR COMO ---</div>
+
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                            {[1, 2, 3].map(val => {
+                                const last = gameState.communityCombo.length > 0 ? gameState.communityCombo[gameState.communityCombo.length - 1] : null;
+                                const lastVal = last && last.type !== 'WILDCARD' && last.type !== 'TOMBOLA' ? last.value : 0;
+                                const disabled = val < lastVal;
+
+                                return (
+                                    <button
+                                        key={val}
+                                        onClick={() => !disabled && handleWildcardDecision(true, val)}
+                                        disabled={disabled}
+                                        style={{
+                                            padding: '10px 0', flex: 1,
+                                            background: disabled ? '#333' : '#F44336',
+                                            color: disabled ? '#555' : 'white',
+                                            border: 'none', borderRadius: '6px',
+                                            cursor: disabled ? 'default' : 'pointer', fontWeight: 'bold'
+                                        }}
+                                    >
+                                        🛑 {val}
+                                    </button>
+                                );
+                            })}
                         </div>
-                        <div style={{ marginTop: '10px' }}>
+
+                        <div style={{ marginTop: '16px' }}>
                             <button onClick={() => setWildcardChoice(null)} style={{ background: 'transparent', border: 'none', color: '#777', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline' }}>
                                 Cancelar
                             </button>

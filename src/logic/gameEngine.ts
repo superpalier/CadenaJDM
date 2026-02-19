@@ -189,7 +189,7 @@ export const initializeGame = (humanName: string = "Player 1", playerCount: numb
     };
 };
 
-export const playCard = (state: GameState, cardIndex: number, options: { asCloser?: boolean } = {}): GameState => {
+export const playCard = (state: GameState, cardIndex: number, options: { asCloser?: boolean, wildcardValue?: number } = {}): GameState => {
     const currentPlayer = state.players[state.currentPlayerIndex];
     const card = currentPlayer.hand[cardIndex];
     if (!card) return state;
@@ -237,10 +237,27 @@ export const playCard = (state: GameState, cardIndex: number, options: { asClose
 
     // Check if Wildcard is being used as a CLOSER
     const isWildcardClose = card.type === 'WILDCARD' && options.asCloser;
+    let finalCard = card;
 
-    if (card.type === 'END' || isWildcardClose) {
+    if (isWildcardClose) {
+        const val = options.wildcardValue || 1;
+        // Validate closing rule: must be >= last card value (if not empty/wildcard)
+        if (state.communityCombo.length > 0) {
+            const last = state.communityCombo[state.communityCombo.length - 1];
+            if (last.type !== 'WILDCARD' && last.type !== 'TOMBOLA') {
+                if (val < last.value) {
+                    console.log(`[INVALID] Wildcard close value ${val} < last ${last.value}`);
+                    return state;
+                }
+            }
+        }
+        // Create virtual card with chosen value for objectives
+        finalCard = { ...card, value: val as 1 | 2 | 3 }; // Enforce type
+    }
+
+    if (finalCard.type === 'END' || isWildcardClose) {
         // Combine accumulated + current + end
-        const totalChain = [...newState.accumulatedCards, ...newState.communityCombo, card];
+        const totalChain = [...newState.accumulatedCards, ...newState.communityCombo, finalCard];
 
         // Check objective against TOTAL chain
         const pref = currentPlayer.preference;

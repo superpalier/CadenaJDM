@@ -166,14 +166,25 @@ function playCard(state, cardIndex, options = {}) {
 
     // Check if Wildcard is being used as a CLOSER
     const isWildcardClose = card.type === 'WILDCARD' && options.asCloser;
-
-    cp.hand.splice(cardIndex, 1);
+    let finalCard = card;
 
     if (isWildcardClose) {
-        // Treat as END Logic
-        // ... handled below in END block or duplicated?
-        // Let's restructure to handle END or Wildcard-as-Closer
+        const val = options.wildcardValue || 1;
+        // Validate closing rule: must be >= last card value (if not empty/wildcard)
+        if (state.communityCombo.length > 0) {
+            const last = state.communityCombo[state.communityCombo.length - 1];
+            if (last.type !== 'WILDCARD' && last.type !== 'TOMBOLA') {
+                if (val < last.value) {
+                    console.log(`[INVALID] Wildcard close value ${val} < last ${last.value}`);
+                    return state;
+                }
+            }
+        }
+        // Create virtual card with chosen value for objectives
+        finalCard = { ...card, value: val };
     }
+
+    cp.hand.splice(cardIndex, 1);
 
     if (card.type === 'TOMBOLA') {
         // Cut the combo!
@@ -195,15 +206,14 @@ function playCard(state, cardIndex, options = {}) {
         return state;
     }
 
-    if (card.type === 'END' || isWildcardClose) {
-        const totalChain = [...state.accumulatedCards, ...state.communityCombo, card];
+    if (finalCard.type === 'END' || isWildcardClose) {
+        const totalChain = [...state.accumulatedCards, ...state.communityCombo, finalCard];
         const pref = PREFERENCES.find(p => p.id === cp.preference.id);
         const met = pref ? pref.check(totalChain) : false;
         const bonus = pref ? pref.bonus : 3;
         const pts = calcComboScore(totalChain, met, bonus);
         cp.score += pts;
 
-        // Save copy
         // Save detailed copy for history
         const sumVal = totalChain.reduce((s, c) => s + (c.type === 'TOMBOLA' ? 5 : c.type === 'WILDCARD' ? 1 : c.value), 0);
         cp.closedChains.push({
@@ -224,7 +234,7 @@ function playCard(state, cardIndex, options = {}) {
         // Explicit Logging
         const cardValues = totalChain.map(c => {
             if (c.type === 'TOMBOLA') return '★(5)';
-            if (c.type === 'WILDCARD') return '🃏(1)';
+            if (c.type === 'WILDCARD') return `🃏(${c.value})`; // Show chosen value
             return `${c.value}`;
         }).join('+');
 
