@@ -255,11 +255,46 @@ const GameBoard: React.FC<GameBoardProps> = ({
                     )}
                 </div>
 
-                {/* RIGHT: Deck */}
-                <div style={{ width: '100px', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px', borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
-                    <div style={{ fontSize: '11px', marginBottom: '6px', opacity: 0.6 }}>MAZO</div>
-                    <div style={{ width: '60px', height: '85px', background: '#c62828', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 'bold', boxShadow: '2px 2px 8px rgba(0,0,0,0.3)' }}>
-                        {gameState.deck.length}
+                {/* RIGHT: Deck and Discard */}
+                <div style={{ width: '100px', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px', borderLeft: '1px solid rgba(255,255,255,0.1)', gap: '15px' }}>
+
+                    {/* Deck */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div style={{ fontSize: '10px', marginBottom: '4px', opacity: 0.6 }}>MAZO</div>
+                        <div style={{ width: '50px', height: '70px', background: '#c62828', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 'bold', boxShadow: '2px 2px 6px rgba(0,0,0,0.3)', border: '2px solid #fff' }}>
+                            {gameState.deck.length}
+                        </div>
+                    </div>
+
+                    {/* Discard Pile */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div style={{ fontSize: '10px', marginBottom: '4px', opacity: 0.6 }}>DESCARTE</div>
+                        {gameState.discardPile && gameState.discardPile.length > 0 ? (
+                            <div style={{ position: 'relative', width: '50px', height: '70px' }}>
+                                <div style={{ transform: 'scale(0.8)', transformOrigin: 'top left' }}>
+                                    <Card card={gameState.discardPile[gameState.discardPile.length - 1]} disabled={true} />
+                                </div>
+                                <div style={{
+                                    position: 'absolute', bottom: -5, right: -5,
+                                    background: '#333', color: '#fff',
+                                    fontSize: '10px', padding: '1px 5px',
+                                    borderRadius: '10px', fontWeight: 'bold',
+                                    border: '1px solid #777'
+                                }}>
+                                    {gameState.discardPile.length}
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{
+                                width: '50px', height: '70px',
+                                border: '2px dashed rgba(255,255,255,0.2)',
+                                borderRadius: '6px',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '20px', opacity: 0.3
+                            }}>
+                                🗑️
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
