@@ -23,8 +23,6 @@ app.get('/{*path}', (req, res) => {
 
 const HAND_SIZE = 5;
 const WIN_SCORE = 100;
-const DRAW_ON_PLAY = 1;
-const DRAW_ON_CLOSE = 2;
 
 // 14 objectives across 3 difficulty tiers
 const PREFERENCES = [
@@ -158,7 +156,12 @@ function playCard(state, cardIndex) {
         state.log.push(`🏆 ${cp.name} cerró (${valuesStr} = ${valuesSum}${met ? ` +${bonus} bonus` : ''}) = ${pts} pts!`);
         state.communityCombo = [];
 
-        drawCards(cp, state, DRAW_ON_CLOSE);
+        state.communityCombo = [];
+
+        // Refill to HAND_SIZE (5)
+        const toDraw = Math.max(0, HAND_SIZE - cp.hand.length);
+        if (toDraw > 0) drawCards(cp, state, toDraw);
+
         if (cp.score >= WIN_SCORE) {
             state.winner = cp.id;
             state.log.push(`🏆 ¡${cp.name} GANA con ${cp.score} pts!`);
@@ -168,7 +171,9 @@ function playCard(state, cardIndex) {
     } else {
         state.communityCombo.push(card);
         state.log.push(`${cp.name} +${card.type}(${card.value}) → combo: ${state.communityCombo.length} cartas`);
-        drawCards(cp, state, DRAW_ON_PLAY);
+        // Refill to HAND_SIZE (5)
+        const toDraw = Math.max(0, HAND_SIZE - cp.hand.length);
+        if (toDraw > 0) drawCards(cp, state, toDraw);
     }
 
     checkMustDiscard(state);

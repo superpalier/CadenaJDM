@@ -3,8 +3,6 @@ import type { Card, CardType, GameState, Player, Preference } from '../types';
 // ===== BALANCE CONSTANTS =====
 const HAND_SIZE = 5;
 const WIN_SCORE = 100;
-const DRAW_ON_PLAY = 1;
-const DRAW_ON_CLOSE = 2;
 
 export const createDeck = (): Card[] => {
     const cards: Card[] = [];
@@ -211,7 +209,9 @@ export const playCard = (state: GameState, cardIndex: number): GameState => {
         const valuesSum = combo.reduce((s, c) => s + c.value, 0);
         newState.log.push(`🏆 ${currentPlayer.name} cerró (${valuesStr} = ${valuesSum}${metObjective ? ` +${bonus} bonus` : ''}) = ${points} pts!`);
 
-        drawCards(newPlayer, newState, DRAW_ON_CLOSE);
+        // Refill hand to HAND_SIZE (5)
+        const cardsToDraw = Math.max(0, HAND_SIZE - newPlayer.hand.length);
+        if (cardsToDraw > 0) drawCards(newPlayer, newState, cardsToDraw);
 
         if (newPlayer.score >= WIN_SCORE) {
             newState.winner = currentPlayer.id;
@@ -223,7 +223,9 @@ export const playCard = (state: GameState, cardIndex: number): GameState => {
     } else {
         newState.communityCombo.push(card);
         newState.log.push(`${currentPlayer.name} +${card.type}(${card.value}) → combo: ${newState.communityCombo.length} cartas`);
-        drawCards(newPlayer, newState, DRAW_ON_PLAY);
+        // Refill hand to HAND_SIZE (5)
+        const cardsToDraw = Math.max(0, HAND_SIZE - newPlayer.hand.length);
+        if (cardsToDraw > 0) drawCards(newPlayer, newState, cardsToDraw);
     }
 
     checkMustDiscard(newState);
