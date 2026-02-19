@@ -242,7 +242,15 @@ export const playCard = (state: GameState, cardIndex: number): GameState => {
 
         newPlayer.score += points;
         // Save copy for history
-        newPlayer.closedChains.push(JSON.parse(JSON.stringify(totalChain)));
+        newPlayer.score += points;
+        // Save copy for history
+        newPlayer.closedChains.push({
+            cards: JSON.parse(JSON.stringify(totalChain)),
+            baseScore: points - (metObjective ? bonus : 0),
+            bonusScore: metObjective ? bonus : 0,
+            objectiveDescription: PREFERENCES.find(p => p.id === pref.id)?.description || pref.description,
+            timestamp: Date.now()
+        });
 
         // RECYCLE EVERYTHING (Accumulated + Current + End)
         newState.discardPile.push(...totalChain);

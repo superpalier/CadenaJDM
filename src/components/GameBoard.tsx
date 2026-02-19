@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { GameState, TutorialStep } from '../types';
-import { initializeGame, playCard, passTurn, discardCard, isValidMove, calculateComboScore, WIN_SCORE, HAND_SIZE, PREFERENCES } from '../logic/gameEngine';
+import { initializeGame, playCard, passTurn, discardCard, isValidMove, calculateComboScore, HAND_SIZE, PREFERENCES } from '../logic/gameEngine';
 import { calculateBestMove } from '../logic/ai';
 import type { AIDifficulty } from '../logic/ai';
 import Card from './Card';
@@ -201,25 +201,18 @@ const GameBoard: React.FC<GameBoardProps> = ({
                     </div>
 
                     <div style={{ background: 'rgba(0,0,0,0.4)', padding: '8px', borderRadius: '8px', fontSize: '11px' }}>
-                        <div style={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '12px' }}>🏆 Puntajes</div>
+                        <div style={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '12px' }}>🏆 Puntajes (Ver detalle)</div>
                         {gameState.players.map(p => (
-                            <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', color: p.id === myPlayer.id ? '#FFD700' : '#ccc', fontWeight: p.id === myPlayer.id ? 'bold' : 'normal' }}>
+                            <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', color: p.id === myPlayer.id ? '#FFD700' : '#ccc', fontWeight: p.id === myPlayer.id ? 'bold' : 'normal' }}>
                                 <span>{p.id === myPlayer.id ? 'Tú' : p.name}</span>
-                                <span>{p.score}/{WIN_SCORE}</span>
+                                <div style={{ transform: 'scale(0.8)', transformOrigin: 'right center' }}>
+                                    <ScoreDisplay score={p.score} closedChains={p.closedChains} />
+                                </div>
                             </div>
                         ))}
                     </div>
 
-                    <div style={{ flex: 1, background: 'rgba(0,0,0,0.4)', padding: '8px', borderRadius: '8px', fontSize: '10px', overflowY: 'auto', display: 'flex', flexDirection: 'column-reverse' }}>
-                        <div style={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '11px', color: '#aaa', position: 'sticky', top: 0 }}>📜 Historial</div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            {gameState.log.slice().reverse().map((msg, i) => (
-                                <div key={i} style={{ padding: '2px', borderBottom: '1px solid rgba(255,255,255,0.05)', color: msg.includes('🏆') ? '#FFD700' : msg.includes('✨') ? '#E040FB' : '#ccc' }}>
-                                    {msg}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+
 
                     {isMyTurn && (
                         <button onClick={handlePass} style={{ padding: '8px', background: '#FFD700', color: '#000', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}>

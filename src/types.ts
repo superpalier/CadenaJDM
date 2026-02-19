@@ -14,6 +14,14 @@ export interface Preference {
     check: (chain: Card[]) => boolean;
 }
 
+export interface ClosedChain {
+    cards: Card[];
+    baseScore: number;
+    bonusScore: number;
+    objectiveDescription: string;
+    timestamp: number;
+}
+
 export interface Player {
     id: string;
     name: string;
@@ -21,7 +29,7 @@ export interface Player {
     hand: Card[];
     preference: Preference;
     score: number;
-    closedChains: Card[][];
+    closedChains: ClosedChain[];
 }
 
 export interface GameState {

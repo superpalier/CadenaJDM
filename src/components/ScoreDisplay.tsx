@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import type { Card } from '../types';
+import type { ClosedChain } from '../types';
 import { WIN_SCORE } from '../logic/gameEngine';
 
 interface ScoreDisplayProps {
     score: number;
-    closedChains: Card[][];
+    closedChains: ClosedChain[];
 }
 
 const ScoreDisplay: React.FC<ScoreDisplayProps> = ({ score, closedChains }) => {
@@ -41,36 +41,47 @@ const ScoreDisplay: React.FC<ScoreDisplayProps> = ({ score, closedChains }) => {
                     <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#FFD700', fontSize: '14px' }}>
                         📜 Historial de Combos
                     </div>
-                    {closedChains.map((chain, i) => {
-                        const valuesSum = chain.reduce((s, c) => s + c.value, 0);
+                    {closedChains.map((chainData, i) => {
                         return (
-                            <div key={i} style={{ marginBottom: '10px', fontSize: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>
-                                <div style={{ color: '#ccc', fontWeight: 'bold' }}>Combo #{i + 1}</div>
-                                <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
-                                    {chain.map((card, j) => (
-                                        <div key={card.id} style={{
-                                            display: 'flex', alignItems: 'center', gap: '2px'
-                                        }}>
-                                            <div style={{
-                                                width: '28px',
-                                                height: '36px',
-                                                background: card.type === 'START' ? '#1565C0' : card.type === 'EXTENSION' ? '#E65100' : '#C62828',
-                                                borderRadius: '3px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: '11px',
-                                                fontWeight: 'bold',
-                                                color: 'white'
-                                            }}>
-                                                {card.value}
-                                            </div>
-                                            {j < chain.length - 1 && <span style={{ color: '#666', fontSize: '10px' }}>+</span>}
-                                        </div>
-                                    ))}
+                            <div key={i} style={{ marginBottom: '12px', fontSize: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>
+                                <div style={{ color: '#aaa', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>Combo #{i + 1}</span>
+                                    <span style={{ fontSize: '10px', opacity: 0.7 }}>{new Date(chainData.timestamp).toLocaleTimeString()}</span>
                                 </div>
-                                <div style={{ marginTop: '4px', color: '#aaa', fontSize: '11px' }}>
-                                    {chain.map(c => c.value).join(' + ')} = <span style={{ color: '#FFD700', fontWeight: 'bold' }}>{valuesSum} pts</span>
+                                <div style={{ display: 'flex', gap: '4px', marginTop: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                    {chainData.cards.map((card, j) => {
+                                        let bg = '#fff';
+                                        let col = '#000';
+                                        let txt = `${card.value}`;
+                                        if (card.type === 'START') { bg = '#1565C0'; col = '#fff'; }
+                                        if (card.type === 'EXTENSION') { bg = '#E65100'; col = '#fff'; }
+                                        if (card.type === 'END') { bg = '#C62828'; col = '#fff'; }
+                                        if (card.type === 'TOMBOLA') { bg = '#9C27B0'; col = '#fff'; txt = '★'; }
+                                        if (card.type === 'WILDCARD') { bg = 'linear-gradient(45deg, #FFEB3B, #00BCD4)'; col = '#000'; txt = '🃏'; }
+
+                                        return (
+                                            <div key={j} style={{
+                                                width: '20px', height: '28px',
+                                                background: bg, color: col,
+                                                borderRadius: '3px',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontWeight: 'bold', fontSize: '12px',
+                                                border: '1px solid #777'
+                                            }}>
+                                                {txt}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <div style={{ marginTop: '6px', color: '#ccc', fontSize: '11px', fontFamily: 'monospace' }}>
+                                    Base: <span style={{ color: '#fff' }}>{chainData.baseScore}</span>
+                                    {chainData.bonusScore > 0 && (
+                                        <> + Bonus <span style={{ color: '#4CAF50' }}>{chainData.bonusScore}</span> <span style={{ fontSize: '9px', fontStyle: 'italic' }}>({chainData.objectiveDescription})</span></>
+                                    )}
+                                    {' = '}
+                                    <span style={{ color: '#FFD700', fontWeight: 'bold', fontSize: '13px' }}>
+                                        {chainData.baseScore + chainData.bonusScore} pts
+                                    </span>
                                 </div>
                             </div>
                         );

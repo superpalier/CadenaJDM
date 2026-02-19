@@ -188,7 +188,15 @@ function playCard(state, cardIndex) {
         cp.score += pts;
 
         // Save copy
-        cp.closedChains.push(JSON.parse(JSON.stringify(totalChain)));
+        // Save detailed copy for history
+        const sumVal = totalChain.reduce((s, c) => s + (c.type === 'TOMBOLA' ? 5 : c.type === 'WILDCARD' ? 1 : c.value), 0);
+        cp.closedChains.push({
+            cards: JSON.parse(JSON.stringify(totalChain)),
+            baseScore: sumVal,
+            bonusScore: met ? bonus : 0,
+            objectiveDescription: pref ? pref.description : 'Unknown',
+            timestamp: Date.now()
+        });
 
         // RECYCLE EVERYTHING
         state.discardPile.push(...totalChain);
@@ -204,7 +212,7 @@ function playCard(state, cardIndex) {
             return `${c.value}`;
         }).join('+');
 
-        const sumVal = totalChain.reduce((s, c) => s + (c.type === 'TOMBOLA' ? 5 : c.type === 'WILDCARD' ? 1 : c.value), 0);
+        // sumVal already calculated above
         const bonusStr = met ? ` + Bonus(${pref.description} = ${bonus})` : '';
         const totalStr = `${pts}`;
 
