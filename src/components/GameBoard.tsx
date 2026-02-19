@@ -260,14 +260,14 @@ const GameBoard: React.FC<GameBoardProps> = ({
             <div style={{ padding: '10px 16px', background: 'rgba(62,39,35,0.8)', borderTop: '3px solid #6d4c41', flexShrink: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
-                        {isMyTurn ? <span style={{ color: '#FFD700' }}>← TU TURNO</span> : <span style={{ color: '#999' }}>Esperando...</span>}
+                        {isMyTurn && gameState.mustDiscard ? <span style={{ color: '#FF9800' }}>🗑️ DESCARTÁ UNA CARTA</span> : isMyTurn ? <span style={{ color: '#FFD700' }}>← TU TURNO</span> : <span style={{ color: '#999' }}>Esperando...</span>}
                     </div>
                     <ScoreDisplay score={myPlayer.score} closedChains={myPlayer.closedChains} />
                 </div>
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
                     {myPlayer.hand.map((card, index) => (
                         <Card key={card.id} card={card}
-                            isPlayable={isMyTurn && isValidMove(combo, card)}
+                            isPlayable={isMyTurn && (gameState.mustDiscard || isValidMove(combo, card))}
                             onClick={() => handleCardClick(index)}
                             disabled={!isMyTurn}
                         />
