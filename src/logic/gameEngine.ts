@@ -89,11 +89,18 @@ export function randomPreference(): Preference {
 // Validate against the COMMUNITY combo
 export const isValidMove = (communityCombo: Card[], card: Card): boolean => {
     if (card.type === 'TOMBOLA') return communityCombo.length > 0; // Cut ONLY if there's something to cut
-    if (card.type === 'WILDCARD') return communityCombo.length > 0; // Wildcard needs a base
+    if (card.type === 'WILDCARD') return true; // Always valid
 
     if (communityCombo.length === 0) return card.type === 'START';
     if (card.type === 'START') return false;
-    if (card.type === 'END') return communityCombo.length > 0;
+
+    if (card.type === 'END') {
+        if (communityCombo.length === 0) return false;
+        const lastCard = communityCombo[communityCombo.length - 1];
+        if (lastCard.type === 'WILDCARD') return true;
+        if (lastCard.type === 'TOMBOLA') return true;
+        return card.value >= lastCard.value;
+    }
 
     const lastCard = communityCombo[communityCombo.length - 1];
     if (lastCard.type === 'WILDCARD') return true; // Anything can follow a Wildcard
@@ -182,7 +189,7 @@ export const initializeGame = (humanName: string = "Player 1", playerCount: numb
     };
 };
 
-export const playCard = (state: GameState, cardIndex: number): GameState => {
+export const playCard = (state: GameState, cardIndex: number, options: { asCloser?: boolean } = {}): GameState => {
     const currentPlayer = state.players[state.currentPlayerIndex];
     const card = currentPlayer.hand[cardIndex];
     if (!card) return state;
@@ -228,7 +235,10 @@ export const playCard = (state: GameState, cardIndex: number): GameState => {
         return newState;
     }
 
-    if (card.type === 'END') {
+    // Check if Wildcard is being used as a CLOSER
+    const isWildcardClose = card.type === 'WILDCARD' && options.asCloser;
+
+    if (card.type === 'END' || isWildcardClose) {
         // Combine accumulated + current + end
         const totalChain = [...newState.accumulatedCards, ...newState.communityCombo, card];
 

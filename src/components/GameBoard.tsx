@@ -15,7 +15,7 @@ interface GameBoardProps {
     mode: 'local' | 'online';
     onlineState?: GameState | null;
     onlinePlayerId?: string | null;
-    onPlayCard?: (cardIndex: number) => void;
+    onPlayCard?: (cardIndex: number, options?: { asCloser?: boolean }) => void;
     onPassTurn?: () => void;
 }
 
@@ -27,6 +27,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
 }) => {
     const [localState, setLocalState] = useState<GameState | null>(null);
     const gameState = mode === 'online' ? onlineState ?? null : localState;
+    const [wildcardChoice, setWildcardChoice] = useState<{ index: number } | null>(null);
 
     useEffect(() => {
         if (mode === 'local') setLocalState(initializeGame("Tú", playerCount));
@@ -77,7 +78,24 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
     const handleCardClick = (index: number) => {
         if (!gameState) return;
-        if (mode === 'online') { onPlayCard?.(index); return; }
+
+        // ONLINE MODE
+        if (mode === 'online') {
+            const myP = gameState.players.find(p => p.id === onlinePlayerId);
+            if (!myP) return;
+            const card = myP.hand[index];
+
+            // If Wildcard on non-empty combo -> Ask
+            if (card.type === 'WILDCARD' && gameState.communityCombo.length > 0 && !gameState.mustDiscard) {
+                setWildcardChoice({ index });
+                return;
+            }
+
+            onPlayCard?.(index);
+            return;
+        }
+
+        // LOCAL MODE
         const myPlayer = gameState.players.find(p => !p.isAI)!;
         const myIdx = gameState.players.indexOf(myPlayer);
         if (gameState.currentPlayerIndex !== myIdx) return;
@@ -88,7 +106,26 @@ const GameBoard: React.FC<GameBoardProps> = ({
             return;
         }
 
+        const card = myPlayer.hand[index];
+        // If Wildcard on non-empty combo -> Ask
+        if (card.type === 'WILDCARD' && gameState.communityCombo.length > 0) {
+            setWildcardChoice({ index });
+            return;
+        }
+
         setLocalState(prev => prev ? playCard(prev, index) : null);
+    };
+
+    const handleWildcardDecision = (asCloser: boolean) => {
+        if (!wildcardChoice) return;
+        const { index } = wildcardChoice;
+        setWildcardChoice(null);
+
+        if (mode === 'online') {
+            onPlayCard?.(index, { asCloser });
+        } else {
+            setLocalState(prev => prev ? playCard(prev, index, { asCloser }) : null);
+        }
     };
 
     const handlePass = () => {
@@ -130,6 +167,43 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
             {mode === 'local' && gameState.isTutorialActive && (
                 <TutorialOverlay step={gameState.tutorialStep} onNext={handleTutorialNext} onSkip={handleTutorialSkip} />
+            )}
+
+            {/* WILDCARD MODAL */}
+            {wildcardChoice && (
+                <div style={{
+                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.8)', zIndex: 2000,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                    <div style={{
+                        background: '#1a1a1a', padding: '20px', borderRadius: '12px',
+                        border: '2px solid #FFD700', textAlign: 'center', maxWidth: '300px'
+                    }}>
+                        <div style={{ fontSize: '40px', marginBottom: '10px' }}>🃏</div>
+                        <h3 style={{ color: '#FFD700', marginBottom: '10px' }}>¿Cómo usar el Comodín?</h3>
+                        <p style={{ fontSize: '12px', color: '#ccc', marginBottom: '20px' }}>
+                            Puedes usarlo para extender el combo (puente) o para cerrarlo si tienes los puntos.
+                        </p>
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                            <button onClick={() => handleWildcardDecision(false)} style={{
+                                padding: '10px 15px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', flex: 1
+                            }}>
+                                🔗 Extender
+                            </button>
+                            <button onClick={() => handleWildcardDecision(true)} style={{
+                                padding: '10px 15px', background: '#F44336', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', flex: 1, fontWeight: 'bold'
+                            }}>
+                                🛑 Cerrar
+                            </button>
+                        </div>
+                        <div style={{ marginTop: '10px' }}>
+                            <button onClick={() => setWildcardChoice(null)} style={{ background: 'transparent', border: 'none', color: '#777', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline' }}>
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* ===== ROW 1: OPPONENTS ===== */}

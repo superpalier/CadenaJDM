@@ -142,8 +142,8 @@ export function useMultiplayer() {
         socketRef.current?.emit('start-game');
     }, []);
 
-    const sendPlayCard = useCallback((cardIndex: number) => {
-        socketRef.current?.emit('play-card', { cardIndex });
+    const sendPlayCard = useCallback((cardIndex: number, options: { asCloser?: boolean } = {}) => {
+        socketRef.current?.emit('play-card', { cardIndex, options });
     }, []);
 
     const sendPassTurn = useCallback(() => {

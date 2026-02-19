@@ -99,11 +99,18 @@ function randomPref() {
 
 function isValidMove(combo, card) {
     if (card.type === 'TOMBOLA') return combo.length > 0;
-    if (card.type === 'WILDCARD') return combo.length > 0;
+    if (card.type === 'WILDCARD') return true; // Always valid
 
     if (combo.length === 0) return card.type === 'START';
     if (card.type === 'START') return false;
-    if (card.type === 'END') return combo.length > 0;
+
+    if (card.type === 'END') {
+        if (combo.length === 0) return false;
+        const last = combo[combo.length - 1];
+        if (last.type === 'WILDCARD') return true;
+        if (last.type === 'TOMBOLA') return true;
+        return card.value >= last.value;
+    }
 
     const last = combo[combo.length - 1];
     if (last.type === 'WILDCARD') return true;
@@ -146,7 +153,7 @@ function advanceRound(state) {
     });
 }
 
-function playCard(state, cardIndex) {
+function playCard(state, cardIndex, options = {}) {
     const cp = state.players[state.currentPlayerIndex];
     const card = cp.hand[cardIndex];
     if (!card) return state;
@@ -157,7 +164,16 @@ function playCard(state, cardIndex) {
 
     if (!isValid) return state;
 
+    // Check if Wildcard is being used as a CLOSER
+    const isWildcardClose = card.type === 'WILDCARD' && options.asCloser;
+
     cp.hand.splice(cardIndex, 1);
+
+    if (isWildcardClose) {
+        // Treat as END Logic
+        // ... handled below in END block or duplicated?
+        // Let's restructure to handle END or Wildcard-as-Closer
+    }
 
     if (card.type === 'TOMBOLA') {
         // Cut the combo!
@@ -179,7 +195,7 @@ function playCard(state, cardIndex) {
         return state;
     }
 
-    if (card.type === 'END') {
+    if (card.type === 'END' || isWildcardClose) {
         const totalChain = [...state.accumulatedCards, ...state.communityCombo, card];
         const pref = PREFERENCES.find(p => p.id === cp.preference.id);
         const met = pref ? pref.check(totalChain) : false;
@@ -570,7 +586,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('play-card', ({ cardIndex }) => {
+    socket.on('play-card', ({ cardIndex, options }) => {
         try {
             const room = rooms.get(socket.roomCode);
             if (!room || !room.state || room.state.winner) return;
