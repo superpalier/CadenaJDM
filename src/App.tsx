@@ -12,6 +12,7 @@ function App() {
   const [playerCount, setPlayerCount] = useState(2);
   const [difficulty, setDifficulty] = useState<AIDifficulty>('normal');
   const [gameMode, setGameMode] = useState<'local' | 'online'>('local');
+  const [gameId, setGameId] = useState(0); // For resetting local game
 
   const mp = useMultiplayer();
 
@@ -36,6 +37,16 @@ function App() {
     mp.disconnect();
     setView('menu');
     setWinner(null);
+  };
+
+  const handleRestart = () => {
+    if (gameMode === 'local') {
+      setGameId(prev => prev + 1);
+      setWinner(null);
+    } else {
+      mp.restartGame();
+      setWinner(null);
+    }
   };
 
   // When online game starts (gameState arrives from server)
@@ -96,6 +107,7 @@ function App() {
             className="w-full h-full"
           >
             <GameBoard
+              key={gameId}
               onEndGame={handleEndGame}
               onBackToMenu={handleBackToMenu}
               playerCount={playerCount}
@@ -103,8 +115,8 @@ function App() {
               mode={gameMode}
               onlineState={mp.gameState}
               onlinePlayerId={mp.playerId}
-              onPlayCard={mp.sendPlayCard}
-              onPassTurn={mp.sendPassTurn}
+              onPlayCard={mp.playCard}
+              onPassTurn={mp.passTurn}
             />
             {winner && (
               <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
@@ -124,6 +136,12 @@ function App() {
                     className="w-full py-3 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition-colors"
                   >
                     Volver al Menú
+                  </button>
+                  <button
+                    onClick={handleRestart}
+                    className="w-full py-3 mt-3 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-400 transition-colors shadow-lg"
+                  >
+                    🏆 Jugar Revancha
                   </button>
                 </motion.div>
               </div>

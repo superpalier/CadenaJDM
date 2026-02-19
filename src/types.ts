@@ -1,4 +1,4 @@
-export type CardType = 'START' | 'EXTENSION' | 'END';
+export type CardType = 'START' | 'EXTENSION' | 'END' | 'TOMBOLA';
 
 export interface Card {
     id: string;
@@ -35,6 +35,7 @@ export interface GameState {
     isTutorialActive: boolean;
     communityCombo: Card[];                 // Shared combo all players build on
     mustDiscard: boolean;                   // True when current player must discard to get to 5 cards
+    accumulatedCards: Card[];               // Stores cards "cut" by Tombola
 }
 
 export type TutorialStep =

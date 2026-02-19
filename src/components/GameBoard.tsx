@@ -235,6 +235,19 @@ const GameBoard: React.FC<GameBoardProps> = ({
                         width: '100%', maxWidth: '550px',
                         boxShadow: combo.length > 0 ? '0 0 20px rgba(255,215,0,0.1)' : 'none'
                     }}>
+                        {gameState.accumulatedCards && gameState.accumulatedCards.length > 0 && (
+                            <>
+                                <div style={{ display: 'flex', gap: '5px', opacity: 0.7, padding: '5px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
+                                    {gameState.accumulatedCards.map((card, i) => (
+                                        <div key={`acc-${i}`} style={{ transform: 'scale(0.85)' }}>
+                                            <Card card={card} disabled={true} />
+                                        </div>
+                                    ))}
+                                </div>
+                                <div style={{ fontSize: '24px', color: '#9C27B0', margin: '0 5px' }}>⚡</div>
+                            </>
+                        )}
+
                         {combo.length === 0 ? (
                             <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
                                 Juega una carta START para abrir el combo
@@ -243,9 +256,9 @@ const GameBoard: React.FC<GameBoardProps> = ({
                             combo.map(card => <Card key={card.id} card={card} disabled={true} />)
                         )}
                     </div>
-                    {combo.length > 0 && (
+                    {(combo.length > 0 || (gameState.accumulatedCards && gameState.accumulatedCards.length > 0)) && (
                         <div style={{ marginTop: '10px', fontSize: '14px', color: '#FFD700', fontWeight: 'bold', textAlign: 'center' }}>
-                            {combo.length} cartas → <strong>{potentialScore} pts</strong> si cierras con END
+                            {combo.length + (gameState.accumulatedCards?.length || 0)} cartas ({(gameState.accumulatedCards?.reduce((s, c) => s + (c.type === 'TOMBOLA' ? 5 : c.value), 0) || 0) + potentialScore} potential pts)
                         </div>
                     )}
                     {combo.length >= 3 && (

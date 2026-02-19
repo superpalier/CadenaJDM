@@ -6,20 +6,33 @@ const WIN_SCORE = 100;
 
 export const createDeck = (): Card[] => {
     const cards: Card[] = [];
-    const values: (1 | 2 | 3)[] = [1, 2, 3];
-    const typeCounts: { type: CardType; count: number }[] = [
-        { type: 'START', count: 12 },
-        { type: 'EXTENSION', count: 20 },
-        { type: 'END', count: 12 },
-    ];
+    // counts handled manually below
     let idCounter = 0;
-    typeCounts.forEach(({ type, count }) => {
-        values.forEach(value => {
-            for (let i = 0; i < count; i++) {
-                cards.push({ id: `card-${idCounter++}`, type, value });
-            }
-        });
-    });
+    const addCards = (type: CardType, total: number) => {
+        for (let i = 0; i < total; i++) {
+            // Distribute values 1, 2, 3
+            const value = (i % 3) + 1 as 1 | 2 | 3;
+            cards.push({ id: `card-${idCounter++}`, type, value });
+        }
+    };
+
+    addCards('START', 25);
+    addCards('EXTENSION', 50);
+    addCards('END', 25);
+
+    // 5 Tombola cards (Value 5)
+    for (let i = 0; i < 5; i++) {
+        cards.push({ id: `card-${idCounter++}`, type: 'TOMBOLA', value: 3 }); // Value 3 arbitrary? User says worth 5pts.
+        // The value property in Card interface is 1|2|3.
+        // Accessing value 5 might break types.
+        // I should update Card interface to allow value 5? Or just add bonus in scoring.
+        // I'll keep value 3 for compatibility with >= checks?
+        // Tombola cuts. It doesn't need to match value?
+        // User: "se debe comenzar de nuevo en la misma linea".
+        // It effectively resets.
+        // I'll set value 3. And scoring logic will handle the 5 points manually.
+    }
+
     return shuffle(cards);
 };
 
@@ -76,17 +89,22 @@ export function randomPreference(): Preference {
 }
 
 // Validate against the COMMUNITY combo
+// Validate against the COMMUNITY combo
 export const isValidMove = (communityCombo: Card[], card: Card): boolean => {
+    if (card.type === 'TOMBOLA') return communityCombo.length > 0; // Cut ONLY if there's something to cut
+
     if (communityCombo.length === 0) return card.type === 'START';
     if (card.type === 'START') return false;
     if (card.type === 'END') return communityCombo.length > 0;
+
     const lastCard = communityCombo[communityCombo.length - 1];
     return card.value >= lastCard.value;
 };
 
 // SCORING: sum of all card values in the combo (including END) + objective bonus
+// SCORING: sum of all card values + Tombola value (5) + objective bonus
 export const calculateComboScore = (combo: Card[], metObjective: boolean, bonusAmount: number): number => {
-    const baseScore = combo.reduce((sum, card) => sum + card.value, 0);
+    const baseScore = combo.reduce((sum, card) => sum + (card.type === 'TOMBOLA' ? 5 : card.value), 0);
     return baseScore + (metObjective ? bonusAmount : 0);
 };
 
@@ -160,6 +178,7 @@ export const initializeGame = (humanName: string = "Player 1", playerCount: numb
         isTutorialActive: true,
         communityCombo: [],
         mustDiscard: false,
+        accumulatedCards: [],
     };
 };
 
@@ -189,25 +208,51 @@ export const playCard = (state: GameState, cardIndex: number): GameState => {
 
     newPlayer.hand.splice(cardIndex, 1);
 
-    if (card.type === 'END') {
-        const combo = [...newState.communityCombo, card];
-        const pref = currentPlayer.preference;
-        const checkFn = PREFERENCES.find(p => p.id === pref.id)?.check ?? pref.check;
-        const metObjective = checkFn(combo);
-        const bonus = PREFERENCES.find(p => p.id === pref.id)?.bonus ?? 3;
-        const points = calculateComboScore(combo, metObjective, bonus);
-
-        newPlayer.score += points;
-        // Save a COPY for history display
-        newPlayer.closedChains.push(JSON.parse(JSON.stringify(combo)));
-
-        // RECYCLE: Move physical cards back to discard pile to keep game flowing
-        newState.discardPile.push(...combo);
+    if (card.type === 'TOMBOLA') {
+        // Cut the combo!
+        const cutCards = [...newState.communityCombo, card]; // Include Tombola
+        newState.accumulatedCards.push(...cutCards);
         newState.communityCombo = [];
 
-        const valuesStr = combo.map(c => c.value).join('+');
-        const valuesSum = combo.reduce((s, c) => s + c.value, 0);
-        newState.log.push(`🏆 ${currentPlayer.name} cerró (${valuesStr} = ${valuesSum}${metObjective ? ` +${bonus} bonus` : ''}) = ${points} pts!`);
+        newState.log.push(`✨ ¡${currentPlayer.name} jugó TOMBOLA! Combo cortado y acumulado (${newState.accumulatedCards.length} cartas en el bote).`);
+
+        // Refill hand
+        const cardsToDraw = Math.max(0, HAND_SIZE - newPlayer.hand.length);
+        if (cardsToDraw > 0) drawCards(newPlayer, newState, cardsToDraw);
+
+        // Turn passes
+        checkMustDiscard(newState);
+        if (!newState.mustDiscard) {
+            newState.currentPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
+        }
+        return newState;
+    }
+
+    if (card.type === 'END') {
+        // Combine accumulated + current + end
+        const totalChain = [...newState.accumulatedCards, ...newState.communityCombo, card];
+
+        // Check objective against TOTAL chain
+        const pref = currentPlayer.preference;
+        const checkFn = PREFERENCES.find(p => p.id === pref.id)?.check ?? pref.check;
+        const metObjective = checkFn(totalChain);
+        const bonus = PREFERENCES.find(p => p.id === pref.id)?.bonus ?? 3;
+
+        const points = calculateComboScore(totalChain, metObjective, bonus);
+
+        newPlayer.score += points;
+        // Save copy for history
+        newPlayer.closedChains.push(JSON.parse(JSON.stringify(totalChain)));
+
+        // RECYCLE EVERYTHING (Accumulated + Current + End)
+        newState.discardPile.push(...totalChain);
+
+        // Clear all
+        newState.accumulatedCards = [];
+        newState.communityCombo = [];
+
+        const valuesStr = totalChain.map(c => c.type === 'TOMBOLA' ? '★(5)' : c.value).join('+');
+        newState.log.push(`🏆 ${currentPlayer.name} cerró (${valuesStr}${metObjective ? ` +${bonus} bonus` : ''}) = ${points} pts!`);
 
         // Refill hand to HAND_SIZE (5)
         const cardsToDraw = Math.max(0, HAND_SIZE - newPlayer.hand.length);
@@ -215,7 +260,7 @@ export const playCard = (state: GameState, cardIndex: number): GameState => {
 
         if (newPlayer.score >= WIN_SCORE) {
             newState.winner = currentPlayer.id;
-            newState.log.push(`🏆 ¡${currentPlayer.name} GANA con ${newPlayer.score} pts!`);
+            // newState.log.push(`🏆 ¡${currentPlayer.name} GANA con ${newPlayer.score} pts!`); // Handled in UI overlay
             return newState;
         }
 

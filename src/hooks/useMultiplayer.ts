@@ -150,6 +150,10 @@ export function useMultiplayer() {
         socketRef.current?.emit('pass-turn');
     }, []);
 
+    const restartGame = useCallback(() => {
+        socketRef.current?.emit('restart-game');
+    }, []);
+
     useEffect(() => {
         return () => {
             socketRef.current?.disconnect();
@@ -157,15 +161,24 @@ export function useMultiplayer() {
     }, []);
 
     return {
-        ...state,
+        connected: state.connected,
+        roomCode: state.roomCode,
+        playerId: state.playerId,
+        players: state.players,
+        aiCount: state.aiCount,
+        difficulty: state.difficulty,
+        isHost: state.isHost,
+        gameState: state.gameState,
+        error: state.error,
         connect,
-        disconnect,
         createRoom,
         joinRoom,
         setAICount,
         setDifficulty,
         startGame,
-        sendPlayCard,
-        sendPassTurn,
+        restartGame,
+        disconnect,
+        playCard: sendPlayCard, // Renamed from sendPlayCard
+        passTurn: sendPassTurn // Renamed from sendPassTurn
     };
 }

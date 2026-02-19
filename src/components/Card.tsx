@@ -14,6 +14,7 @@ const Card: React.FC<CardProps> = ({ card, onClick, disabled, isPlayable, small 
     if (card.type === 'START') borderColor = '#2196F3';
     if (card.type === 'EXTENSION') borderColor = '#FF9800';
     if (card.type === 'END') borderColor = '#F44336';
+    if (card.type === 'TOMBOLA') borderColor = '#9C27B0'; // Purple for Tombola
 
     const canClick = !disabled && isPlayable;
 
@@ -34,7 +35,11 @@ const Card: React.FC<CardProps> = ({ card, onClick, disabled, isPlayable, small 
             style={{
                 width: w,
                 height: h,
-                background: disabled ? '#e0e0e0' : canClick ? '#fffef0' : 'white',
+                background: disabled
+                    ? '#e0e0e0'
+                    : card.type === 'TOMBOLA'
+                        ? 'linear-gradient(135deg, #fff 0%, #ffd700 50%, #fff 100%)' // Shiny Gold
+                        : canClick ? '#fffef0' : 'white',
                 border: finalBorder,
                 borderRadius: small ? '4px' : '8px',
                 display: 'flex',

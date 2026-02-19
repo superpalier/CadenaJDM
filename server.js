@@ -62,20 +62,24 @@ function shuffle(array) {
 
 function createDeck() {
     const cards = [];
-    const values = [1, 2, 3];
-    const typeCounts = [
-        { type: 'START', count: 12 },
-        { type: 'EXTENSION', count: 20 },
-        { type: 'END', count: 12 },
-    ];
     let id = 0;
-    typeCounts.forEach(({ type, count }) => {
-        values.forEach(value => {
-            for (let i = 0; i < count; i++) {
-                cards.push({ id: `card-${id++}`, type, value });
-            }
-        });
-    });
+
+    // 25 START, 50 EXT, 25 END
+    const addCards = (type, total) => {
+        for (let i = 0; i < total; i++) {
+            const value = (i % 3) + 1;
+            cards.push({ id: `card-${id++}`, type, value });
+        }
+    };
+    addCards('START', 25);
+    addCards('EXTENSION', 50);
+    addCards('END', 25);
+
+    // 5 TOMBOLA (Value 5)
+    for (let i = 0; i < 5; i++) {
+        cards.push({ id: `card-${id++}`, type: 'TOMBOLA', value: 3 });
+    }
+
     return shuffle(cards);
 }
 
@@ -89,6 +93,7 @@ function randomPref() {
 }
 
 function isValidMove(combo, card) {
+    if (card.type === 'TOMBOLA') return combo.length > 0;
     if (combo.length === 0) return card.type === 'START';
     if (card.type === 'START') return false;
     if (card.type === 'END') return combo.length > 0;
@@ -96,9 +101,9 @@ function isValidMove(combo, card) {
     return card.value >= last.value;
 }
 
-// SCORING: sum of all card values + bonus
+// SCORING: sum of all card values + Tombola(5) + bonus
 function calcComboScore(combo, metObjective, bonusAmount) {
-    const base = combo.reduce((sum, c) => sum + c.value, 0);
+    const base = combo.reduce((sum, c) => sum + (c.type === 'TOMBOLA' ? 5 : c.value), 0);
     return base + (metObjective ? bonusAmount : 0);
 }
 
@@ -144,24 +149,46 @@ function playCard(state, cardIndex) {
 
     cp.hand.splice(cardIndex, 1);
 
+    if (card.type === 'TOMBOLA') {
+        // Cut the combo!
+        const cutCards = [...state.communityCombo, card];
+        state.accumulatedCards.push(...cutCards);
+        state.communityCombo = [];
+
+        state.log.push(`✨ ¡${cp.name} jugó TOMBOLA! Combo acumulado (${state.accumulatedCards.length} cartas).`);
+
+        // Refill
+        const toDraw = Math.max(0, HAND_SIZE - cp.hand.length);
+        if (toDraw > 0) drawCards(cp, state, toDraw);
+
+        // Turn advances
+        checkMustDiscard(state);
+        if (!state.mustDiscard) {
+            state.currentPlayerIndex = (state.currentPlayerIndex + 1) % state.players.length;
+        }
+        return state;
+    }
+
     if (card.type === 'END') {
-        const combo = [...state.communityCombo, card];
+        const totalChain = [...state.accumulatedCards, ...state.communityCombo, card];
         const pref = PREFERENCES.find(p => p.id === cp.preference.id);
-        const met = pref ? pref.check(combo) : false;
+        const met = pref ? pref.check(totalChain) : false;
         const bonus = pref ? pref.bonus : 3;
-        const pts = calcComboScore(combo, met, bonus);
+        const pts = calcComboScore(totalChain, met, bonus);
         cp.score += pts;
-        // Save a COPY for history
-        cp.closedChains.push(JSON.parse(JSON.stringify(combo)));
 
-        // RECYCLE
-        state.discardPile.push(...combo);
-        const valuesStr = combo.map(c => c.value).join('+');
-        const valuesSum = combo.reduce((s, c) => s + c.value, 0);
-        state.log.push(`🏆 ${cp.name} cerró (${valuesStr} = ${valuesSum}${met ? ` +${bonus} bonus` : ''}) = ${pts} pts!`);
+        // Save copy
+        cp.closedChains.push(JSON.parse(JSON.stringify(totalChain)));
+
+        // RECYCLE EVERYTHING
+        state.discardPile.push(...totalChain);
+
+        // Clear
+        state.accumulatedCards = [];
         state.communityCombo = [];
 
-        state.communityCombo = [];
+        const valuesStr = totalChain.map(c => c.type === 'TOMBOLA' ? '★' : c.value).join('+');
+        state.log.push(`🏆 ${cp.name} cerró (${valuesStr}${met ? ` +${bonus} bonus` : ''}) = ${pts} pts!`);
 
         // Refill to HAND_SIZE (5)
         const toDraw = Math.max(0, HAND_SIZE - cp.hand.length);
@@ -178,6 +205,7 @@ function playCard(state, cardIndex) {
         state.log.push(`${cp.name} +${card.type}(${card.value}) → combo: ${state.communityCombo.length} cartas`);
         // Refill to HAND_SIZE (5)
         const toDraw = Math.max(0, HAND_SIZE - cp.hand.length);
+
         if (toDraw > 0) drawCards(cp, state, toDraw);
     }
 
@@ -348,7 +376,9 @@ function createGameState(room) {
         currentPlayerIndex: Math.floor(Math.random() * players.length),
         winner: null,
         log: ['¡Juego iniciado!'],
+        log: ['¡Juego iniciado!'],
         communityCombo: [],
+        accumulatedCards: [], // Init accumulated cards
         mustDiscard: false,
     };
 }
@@ -477,6 +507,37 @@ io.on('connection', (socket) => {
             runAITurns(room);
         } catch (error) {
             console.error('CRITICAL ERROR in start-game:', error);
+        }
+    });
+
+    socket.on('restart-game', () => {
+        try {
+            const room = rooms.get(socket.roomCode);
+            if (!room || room.host !== socket.id) return;
+            if (!room.state || !room.state.winner) return; // Only restart if game over
+
+            // Reset state but keep players
+            const newState = createGameState(room);
+            // Preserve players' names/ids but reset hands/scores
+            newState.players = room.state.players.map(p => ({
+                ...p,
+                hand: [],
+                score: 0,
+                closedChains: [],
+                preference: randomPref() // initial pref? Or handled in createGameState?
+                // createGameState calls dealInitialHands which sets prefs
+            }));
+
+            // Actually createGameState does a fresh init. 
+            // We should just use createGameState logic fully.
+            // createGameState(room) returns new state with fresh hands.
+            room.state = createGameState(room);
+
+            console.log(`🔄 Game restarted in room ${socket.roomCode}`);
+            broadcastState(room);
+            runAITurns(room);
+        } catch (error) {
+            console.error('CRITICAL ERROR in restart-game:', error);
         }
     });
 
