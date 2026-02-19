@@ -9,6 +9,7 @@ import ScoreDisplay from './ScoreDisplay';
 
 interface GameBoardProps {
     onEndGame: (winner: string) => void;
+    onBackToMenu: () => void;
     playerCount: number;
     difficulty: AIDifficulty;
     mode: 'local' | 'online';
@@ -21,7 +22,7 @@ interface GameBoardProps {
 const PLAYER_COLORS = ['#c62828', '#1565C0', '#2E7D32', '#6A1B9A', '#E65100'];
 
 const GameBoard: React.FC<GameBoardProps> = ({
-    onEndGame, playerCount, difficulty, mode,
+    onEndGame, onBackToMenu, playerCount, difficulty, mode,
     onlineState, onlinePlayerId, onPlayCard, onPassTurn
 }) => {
     const [localState, setLocalState] = useState<GameState | null>(null);
@@ -191,6 +192,10 @@ const GameBoard: React.FC<GameBoardProps> = ({
                             PASAR TURNO
                         </button>
                     )}
+
+                    <button onClick={() => { if (confirm('¿Seguro que querés salir de la partida?')) onBackToMenu(); }} style={{ padding: '6px', background: 'rgba(255,255,255,0.08)', color: '#999', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', width: '100%', marginTop: 'auto' }}>
+                        ← Salir al Menú
+                    </button>
                 </div>
 
                 {/* CENTER: COMMUNITY COMBO */}

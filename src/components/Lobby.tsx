@@ -32,19 +32,62 @@ const Lobby: React.FC<LobbyProps> = ({
     const [playerName, setPlayerName] = useState('');
     const [joinCode, setJoinCode] = useState('');
     const [view, setView] = useState<'choice' | 'creating' | 'joining' | 'waiting'>('choice');
+    const [nameError, setNameError] = useState('');
+    const [codeError, setCodeError] = useState('');
+    const [nameTouched, setNameTouched] = useState(false);
+    const [codeTouched, setCodeTouched] = useState(false);
 
     useEffect(() => {
         onConnect();
     }, [onConnect]);
 
+    // Validate name
+    const validateName = (name: string): string => {
+        if (!name.trim()) return 'Ingresá tu nombre';
+        if (name.trim().length < 2) return 'Mínimo 2 caracteres';
+        if (name.trim().length > 15) return 'Máximo 15 caracteres';
+        return '';
+    };
+
+    // Validate code
+    const validateCode = (code: string): string => {
+        if (!code.trim()) return 'Ingresá el código de sala';
+        if (code.length < 4) return 'El código tiene 4 caracteres';
+        if (!/^[A-Z0-9]{4}$/.test(code)) return 'Solo letras y números';
+        return '';
+    };
+
+    const handleNameChange = (val: string) => {
+        // Only allow letters, numbers and spaces
+        const clean = val.replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ0-9 ]/g, '');
+        setPlayerName(clean);
+        if (nameTouched) setNameError(validateName(clean));
+    };
+
+    const handleCodeChange = (val: string) => {
+        // Only allow alphanumeric, uppercase
+        const clean = val.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 4);
+        setJoinCode(clean);
+        if (codeTouched) setCodeError(validateCode(clean));
+    };
+
     const handleCreate = () => {
-        if (!playerName.trim()) return;
+        setNameTouched(true);
+        const err = validateName(playerName);
+        setNameError(err);
+        if (err) return;
         onCreateRoom(playerName.trim());
         setView('waiting');
     };
 
     const handleJoin = () => {
-        if (!playerName.trim() || !joinCode.trim()) return;
+        setNameTouched(true);
+        setCodeTouched(true);
+        const nErr = validateName(playerName);
+        const cErr = validateCode(joinCode);
+        setNameError(nErr);
+        setCodeError(cErr);
+        if (nErr || cErr) return;
         onJoinRoom(joinCode.trim(), playerName.trim());
         setView('waiting');
     };
@@ -62,16 +105,21 @@ const Lobby: React.FC<LobbyProps> = ({
         maxWidth: '400px',
     };
 
-    const inputStyle: React.CSSProperties = {
+    const inputStyle = (hasError: boolean): React.CSSProperties => ({
         width: '100%',
         padding: '12px',
         fontSize: '16px',
         borderRadius: '8px',
-        border: '2px solid rgba(255,255,255,0.2)',
+        border: `2px solid ${hasError ? '#F44336' : 'rgba(255,255,255,0.2)'}`,
         background: 'rgba(0,0,0,0.3)',
         color: '#fff',
         outline: 'none',
         textAlign: 'center',
+        transition: 'border-color 0.2s',
+    });
+
+    const errMsgStyle: React.CSSProperties = {
+        fontSize: '12px', color: '#EF9A9A', marginTop: '6px', textAlign: 'center',
     };
 
     const btnStyle = (primary = false): React.CSSProperties => ({
@@ -106,7 +154,8 @@ const Lobby: React.FC<LobbyProps> = ({
             {error && (
                 <div style={{
                     background: 'rgba(244,67,54,0.2)', border: '1px solid #F44336',
-                    padding: '10px 16px', borderRadius: '8px', fontSize: '14px', color: '#EF9A9A'
+                    padding: '10px 16px', borderRadius: '8px', fontSize: '14px', color: '#EF9A9A',
+                    maxWidth: '400px', width: '100%', textAlign: 'center'
                 }}>
                     ❌ {error}
                 </div>
@@ -115,38 +164,54 @@ const Lobby: React.FC<LobbyProps> = ({
             {connected && view === 'choice' && (
                 <>
                     <div style={boxStyle}>
+                        <label style={{ fontSize: '12px', opacity: 0.6, marginBottom: '6px', display: 'block', textAlign: 'center' }}>
+                            TU NOMBRE
+                        </label>
                         <input
-                            placeholder="Tu nombre"
+                            placeholder="Ej: Juan, Cata..."
                             value={playerName}
-                            onChange={e => setPlayerName(e.target.value)}
-                            style={inputStyle}
+                            onChange={e => handleNameChange(e.target.value)}
+                            onBlur={() => { setNameTouched(true); setNameError(validateName(playerName)); }}
+                            style={inputStyle(!!nameError && nameTouched)}
                             maxLength={15}
                         />
+                        {nameError && nameTouched && <div style={errMsgStyle}>⚠ {nameError}</div>}
                     </div>
+
                     <button
-                        onClick={() => { if (playerName.trim()) { handleCreate(); } }}
-                        style={btnStyle(true)}
-                        disabled={!playerName.trim()}
+                        onClick={handleCreate}
+                        style={{ ...btnStyle(true), maxWidth: '400px', opacity: !playerName.trim() ? 0.5 : 1 }}
                     >
                         🏠 CREAR SALA
                     </button>
-                    <div style={{ fontSize: '14px', opacity: 0.5 }}>— o —</div>
-                    <div style={{ ...boxStyle, display: 'flex', gap: '10px' }}>
-                        <input
-                            placeholder="CÓDIGO"
-                            value={joinCode}
-                            onChange={e => setJoinCode(e.target.value.toUpperCase())}
-                            style={{ ...inputStyle, letterSpacing: '4px', fontFamily: 'monospace', fontSize: '20px' }}
-                            maxLength={4}
-                        />
-                        <button
-                            onClick={handleJoin}
-                            style={{ ...btnStyle(true), width: 'auto', minWidth: '80px' }}
-                            disabled={!playerName.trim() || joinCode.length < 4}
-                        >
-                            UNIRSE
-                        </button>
+
+                    <div style={{ fontSize: '14px', opacity: 0.5 }}>— o unirse a una sala —</div>
+
+                    <div style={{ ...boxStyle, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <label style={{ fontSize: '12px', opacity: 0.6, textAlign: 'center' }}>
+                            CÓDIGO DE SALA
+                        </label>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <div style={{ flex: 1 }}>
+                                <input
+                                    placeholder="ABCD"
+                                    value={joinCode}
+                                    onChange={e => handleCodeChange(e.target.value)}
+                                    onBlur={() => { setCodeTouched(true); setCodeError(validateCode(joinCode)); }}
+                                    style={{ ...inputStyle(!!codeError && codeTouched), letterSpacing: '6px', fontFamily: 'monospace', fontSize: '22px' }}
+                                    maxLength={4}
+                                />
+                            </div>
+                            <button
+                                onClick={handleJoin}
+                                style={{ ...btnStyle(true), width: 'auto', minWidth: '90px', opacity: (!playerName.trim() || joinCode.length < 4) ? 0.5 : 1 }}
+                            >
+                                UNIRSE
+                            </button>
+                        </div>
+                        {codeError && codeTouched && <div style={errMsgStyle}>⚠ {codeError}</div>}
                     </div>
+
                     <button onClick={onBack} style={{ ...btnStyle(), maxWidth: '200px' }}>
                         ← Volver
                     </button>
@@ -156,19 +221,18 @@ const Lobby: React.FC<LobbyProps> = ({
             {connected && view === 'waiting' && roomCode && (
                 <>
                     {/* Room Code Display */}
-                    <div style={{
-                        ...boxStyle, textAlign: 'center'
-                    }}>
+                    <div style={{ ...boxStyle, textAlign: 'center' }}>
                         <div style={{ fontSize: '13px', opacity: 0.6, marginBottom: '8px' }}>CÓDIGO DE SALA</div>
                         <div style={{
                             fontSize: '48px', fontWeight: 'bold', letterSpacing: '8px',
                             fontFamily: 'monospace', color: '#FFD700',
-                            background: 'rgba(255,215,0,0.1)', padding: '8px 16px', borderRadius: '10px'
+                            background: 'rgba(255,215,0,0.1)', padding: '8px 16px', borderRadius: '10px',
+                            userSelect: 'all', cursor: 'pointer'
                         }}>
                             {roomCode}
                         </div>
                         <div style={{ fontSize: '12px', opacity: 0.5, marginTop: '6px' }}>
-                            Comparte este código
+                            📋 Click para seleccionar y compartir
                         </div>
                     </div>
 
@@ -195,12 +259,16 @@ const Lobby: React.FC<LobbyProps> = ({
                                 🤖 IA {['Rojo', 'Azul', 'Verde', 'Morado'][i]}
                             </div>
                         ))}
+                        {totalPlayers < 2 && (
+                            <div style={{ fontSize: '12px', color: '#FF9800', marginTop: '8px', textAlign: 'center' }}>
+                                ⚠ Se necesitan al menos 2 jugadores
+                            </div>
+                        )}
                     </div>
 
                     {/* Host Controls */}
                     {isHost && (
                         <>
-                            {/* AI Count */}
                             <div style={boxStyle}>
                                 <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '13px' }}>🤖 IAs</div>
                                 <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
@@ -216,7 +284,6 @@ const Lobby: React.FC<LobbyProps> = ({
                                 </div>
                             </div>
 
-                            {/* Difficulty */}
                             {aiCount > 0 && (
                                 <div style={boxStyle}>
                                     <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '13px' }}>🎯 Nivel IA</div>
@@ -236,20 +303,21 @@ const Lobby: React.FC<LobbyProps> = ({
                                 </div>
                             )}
 
-                            {/* Start */}
                             <button
                                 onClick={onStartGame}
                                 disabled={!canStart}
                                 style={{
-                                    ...btnStyle(true),
-                                    maxWidth: '300px',
-                                    opacity: canStart ? 1 : 0.4,
-                                    fontSize: '20px',
-                                    padding: '14px'
+                                    ...btnStyle(true), maxWidth: '300px',
+                                    opacity: canStart ? 1 : 0.4, fontSize: '20px', padding: '14px'
                                 }}
                             >
                                 🎮 INICIAR PARTIDA
                             </button>
+                            {!canStart && (
+                                <div style={{ fontSize: '12px', color: '#FF9800', textAlign: 'center' }}>
+                                    Necesitás al menos 2 jugadores (humanos + IAs)
+                                </div>
+                            )}
                         </>
                     )}
 

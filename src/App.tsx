@@ -97,6 +97,7 @@ function App() {
           >
             <GameBoard
               onEndGame={handleEndGame}
+              onBackToMenu={handleBackToMenu}
               playerCount={playerCount}
               difficulty={difficulty}
               mode={gameMode}
