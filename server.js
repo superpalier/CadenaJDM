@@ -66,9 +66,9 @@ function createDeck() {
     const cards = [];
     const values = [1, 2, 3];
     const typeCounts = [
-        { type: 'START', count: 4 },
-        { type: 'EXTENSION', count: 10 },
-        { type: 'END', count: 4 },
+        { type: 'START', count: 12 },
+        { type: 'EXTENSION', count: 30 },
+        { type: 'END', count: 12 },
     ];
     let id = 0;
     typeCounts.forEach(({ type, count }) => {
@@ -148,11 +148,15 @@ function playCard(state, cardIndex) {
         const bonus = pref ? pref.bonus : 3;
         const pts = calcComboScore(combo, met, bonus);
         cp.score += pts;
-        cp.closedChains.push(combo);
+        // Save a COPY for history
+        cp.closedChains.push(JSON.parse(JSON.stringify(combo)));
 
+        // RECYCLE
+        state.discardPile.push(...combo);
         const valuesStr = combo.map(c => c.value).join('+');
         const valuesSum = combo.reduce((s, c) => s + c.value, 0);
         state.log.push(`🏆 ${cp.name} cerró (${valuesStr} = ${valuesSum}${met ? ` +${bonus} bonus` : ''}) = ${pts} pts!`);
+        state.communityCombo = [];
 
         drawCards(cp, state, DRAW_ON_CLOSE);
         if (cp.score >= WIN_SCORE) {

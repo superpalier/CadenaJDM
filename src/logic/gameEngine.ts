@@ -10,9 +10,9 @@ export const createDeck = (): Card[] => {
     const cards: Card[] = [];
     const values: (1 | 2 | 3)[] = [1, 2, 3];
     const typeCounts: { type: CardType; count: number }[] = [
-        { type: 'START', count: 4 },
-        { type: 'EXTENSION', count: 10 },
-        { type: 'END', count: 4 },
+        { type: 'START', count: 12 },
+        { type: 'EXTENSION', count: 30 },
+        { type: 'END', count: 12 },
     ];
     let idCounter = 0;
     typeCounts.forEach(({ type, count }) => {
@@ -200,7 +200,12 @@ export const playCard = (state: GameState, cardIndex: number): GameState => {
         const points = calculateComboScore(combo, metObjective, bonus);
 
         newPlayer.score += points;
-        newPlayer.closedChains.push(combo);
+        // Save a COPY for history display
+        newPlayer.closedChains.push(JSON.parse(JSON.stringify(combo)));
+
+        // RECYCLE: Move physical cards back to discard pile to keep game flowing
+        newState.discardPile.push(...combo);
+        newState.communityCombo = [];
 
         const valuesStr = combo.map(c => c.value).join('+');
         const valuesSum = combo.reduce((s, c) => s + c.value, 0);
