@@ -1,5 +1,5 @@
 import type { GameState, Card } from '../types';
-import { isValidMove, calculateComboScore, WIN_SCORE } from './gameEngine';
+import { isValidMove, calculateComboScore, WIN_SCORE, PREFERENCES } from './gameEngine';
 
 export type AIDifficulty = 'facil' | 'normal' | 'experta';
 
@@ -32,8 +32,11 @@ export const calculateBestMove = (state: GameState, difficulty: AIDifficulty = '
     for (const { index, card } of validMoves) {
         if (card.type === 'END') {
             const pc = [...combo, card];
-            const met = aiPlayer.preference.check(pc);
-            const pts = calculateComboScore(pc, met);
+            const realPref = PREFERENCES.find(p => p.id === aiPlayer.preference.id);
+            const checkFn = realPref?.check ?? aiPlayer.preference.check;
+            const met = checkFn(pc);
+            const bonus = realPref?.bonus ?? 3;
+            const pts = calculateComboScore(pc, met, bonus);
             if (aiPlayer.score + pts >= WIN_SCORE) return index;
         }
     }
@@ -55,8 +58,11 @@ export const calculateBestMove = (state: GameState, difficulty: AIDifficulty = '
         } else if (card.type === 'END') {
             // CLOSE the community combo and steal the points!
             const pc = [...combo, card];
-            const met = aiPlayer.preference.check(pc);
-            const pts = calculateComboScore(pc, met);
+            const realPref = PREFERENCES.find(p => p.id === aiPlayer.preference.id);
+            const checkFn = realPref?.check ?? aiPlayer.preference.check;
+            const met = checkFn(pc);
+            const bonus = realPref?.bonus ?? 3;
+            const pts = calculateComboScore(pc, met, bonus);
 
             // Bigger combo = more tempting to close
             if (combo.length >= 4) score += isExperta ? 80 : 50;

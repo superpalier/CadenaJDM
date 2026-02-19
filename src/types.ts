@@ -9,6 +9,8 @@ export interface Card {
 export interface Preference {
     id: string;
     description: string;
+    bonus: number;
+    difficulty: 'easy' | 'normal' | 'hard';
     check: (chain: Card[]) => boolean;
 }
 

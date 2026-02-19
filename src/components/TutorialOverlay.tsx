@@ -8,13 +8,13 @@ interface TutorialOverlayProps {
 }
 
 const stepsContent: Record<TutorialStep, string> = {
-    'WELCOME': 'Bienvenido. Llega a 12 puntos para ganar.',
-    'EXPLAIN_HAND': 'Estas son tus cartas. AZUL inicia, NARANJA enlaza, ROJO termina.',
-    'PLAY_START': 'Juega una carta AZUL (START) para empezar.',
-    'EXPLAIN_VALUE': 'Las cartas deben ser IGUALES o MAYORES que la anterior.',
-    'PLAY_LINK': 'Juega una carta NARANJA (EXTENSION) para continuar.',
-    'EXPLAIN_END': 'Juega una carta ROJA (END) para obtener puntos.',
-    'COMPLETED': 'Listo. ¡Buena suerte!'
+    'WELCOME': '¡Bienvenido a Cadena JDM! Primer jugador en llegar a 100 puntos gana. Construyan el combo comunitario entre todos, ¡y el que lo cierre se lleva los puntos!',
+    'EXPLAIN_HAND': 'Tenés 5 cartas. AZUL (START) inicia un combo, NARANJA (EXTENSION) lo agranda, y ROJO (END) lo cierra. Los valores van del 1 al 3.',
+    'PLAY_START': '👆 Jugá una carta AZUL (START) para iniciar el combo comunitario.',
+    'EXPLAIN_VALUE': 'Cada carta que agregues debe tener un valor IGUAL o MAYOR a la anterior. ¡Armá un combo largo para más puntos!',
+    'PLAY_LINK': '👆 Jugá una carta NARANJA (EXTENSION) para agrandar el combo.',
+    'EXPLAIN_END': 'Jugá una carta ROJA (END) para cerrar el combo. Sumás los valores de todas las cartas + bonus si cumpliste tu objetivo secreto. ¡Cerrar = nueva ronda!',
+    'COMPLETED': '¡Listo! Si tenés más de 5 cartas, descartá una. Si el mazo se acaba, se mezcla la pila de descarte. ¡Buena suerte!'
 };
 
 const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ step, onNext, onSkip }) => {
@@ -35,7 +35,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ step, onNext, onSkip 
                 background: 'white',
                 padding: '20px',
                 borderRadius: '12px',
-                maxWidth: '350px',
+                maxWidth: '380px',
                 boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
                 border: '3px solid #FFD700'
             }}>
@@ -58,7 +58,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ step, onNext, onSkip 
                     </button>
                 </div>
 
-                <p style={{ fontSize: '15px', color: '#333', marginBottom: '16px', lineHeight: '1.4' }}>{text}</p>
+                <p style={{ fontSize: '14px', color: '#333', marginBottom: '16px', lineHeight: '1.5' }}>{text}</p>
 
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                     {!needsInput && step !== 'COMPLETED' && (
@@ -107,7 +107,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({ step, onNext, onSkip 
                             fontSize: '14px',
                             fontWeight: 'bold'
                         }}>
-                            👆 Juega una carta
+                            👆 Jugá una carta
                         </div>
                     )}
                 </div>

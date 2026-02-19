@@ -120,8 +120,9 @@ const GameBoard: React.FC<GameBoardProps> = ({
     const metObjective = combo.length > 0 && checkFn
         ? checkFn([...combo])
         : false;
+    const bonusAmt = realPref?.bonus ?? 3;
     const potentialScore = combo.length > 0
-        ? calculateComboScore([...combo, { id: 'temp', type: 'END', value: 1 }], metObjective)
+        ? calculateComboScore([...combo, { id: 'temp', type: 'END', value: 1 }], metObjective, bonusAmt)
         : 0;
 
     return (
@@ -181,13 +182,20 @@ const GameBoard: React.FC<GameBoardProps> = ({
                     </div>
 
                     <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: '10px', borderRadius: '10px', fontSize: '12px', border: '2px solid #FFD700' }}>
-                        <div style={{ fontWeight: 'bold', marginBottom: '6px', textAlign: 'center' }}>🎯 TU OBJETIVO</div>
+                        <div style={{ fontWeight: 'bold', marginBottom: '6px', textAlign: 'center', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}>
+                            🎯 TU OBJETIVO
+                            {realPref && (
+                                <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: realPref.difficulty === 'hard' ? '#F44336' : realPref.difficulty === 'normal' ? '#FF9800' : '#4CAF50', color: 'white' }}>
+                                    +{realPref.bonus}
+                                </span>
+                            )}
+                        </div>
                         <div style={{ background: 'rgba(255,255,255,0.2)', padding: '6px', borderRadius: '6px', textAlign: 'center', fontSize: '11px', fontWeight: 'bold' }}>
                             "{myPlayer.preference?.description || '...'}"
                         </div>
                         {combo.length > 0 && (
                             <div style={{ marginTop: '6px', fontSize: '11px', padding: '4px', background: metObjective ? 'rgba(76,175,80,0.3)' : 'rgba(244,67,54,0.3)', borderRadius: '4px', textAlign: 'center', border: `1px solid ${metObjective ? '#4CAF50' : '#F44336'}` }}>
-                                {metObjective ? '✅ ¡Cumplido!' : '❌ No cumplido'}
+                                {metObjective ? `✅ ¡+${bonusAmt} bonus!` : '❌ No cumplido'}
                             </div>
                         )}
                     </div>

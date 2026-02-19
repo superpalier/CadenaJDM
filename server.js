@@ -23,17 +23,34 @@ app.get('/{*path}', (req, res) => {
 
 const HAND_SIZE = 5;
 const WIN_SCORE = 100;
-const OBJECTIVE_BONUS = 3;
 const DRAW_ON_PLAY = 1;
 const DRAW_ON_CLOSE = 2;
 
+// 14 objectives across 3 difficulty tiers
 const PREFERENCES = [
-    { id: 'p1', description: 'Combo de 3+ cartas', check: (chain) => chain.length >= 3 },
-    { id: 'p2', description: 'Combo de 4+ cartas', check: (chain) => chain.length >= 4 },
-    { id: 'p3', description: 'Al menos 2 Extensiones', check: (chain) => chain.filter(c => c.type === 'EXTENSION').length >= 2 },
-    { id: 'p4', description: 'Todos los valores iguales', check: (chain) => chain.length >= 2 && new Set(chain.map(c => c.value)).size === 1 },
-    { id: 'p5', description: 'Empezar con valor 1', check: (chain) => chain.length > 0 && chain[0].value === 1 },
-    { id: 'p6', description: 'Solo valores bajos (1 o 2)', check: (chain) => chain.every(c => c.value <= 2) },
+    // EASY (+2)
+    { id: 'e1', description: 'Combo de 3+ cartas', bonus: 2, difficulty: 'easy', check: (c) => c.length >= 3 },
+    { id: 'e2', description: 'Empezar con valor 1', bonus: 2, difficulty: 'easy', check: (c) => c.length > 0 && c[0].value === 1 },
+    { id: 'e3', description: 'Terminar con valor 3', bonus: 2, difficulty: 'easy', check: (c) => c.length > 0 && c[c.length - 1].value === 3 },
+    { id: 'e4', description: 'Al menos 1 Extensión', bonus: 2, difficulty: 'easy', check: (c) => c.filter(x => x.type === 'EXTENSION').length >= 1 },
+    // NORMAL (+4)
+    { id: 'n1', description: 'Combo de 4+ cartas', bonus: 4, difficulty: 'normal', check: (c) => c.length >= 4 },
+    { id: 'n2', description: 'Al menos 2 Extensiones', bonus: 4, difficulty: 'normal', check: (c) => c.filter(x => x.type === 'EXTENSION').length >= 2 },
+    { id: 'n3', description: 'Solo valores bajos (1-2)', bonus: 4, difficulty: 'normal', check: (c) => c.length >= 2 && c.every(x => x.value <= 2) },
+    { id: 'n4', description: 'Suma de valores ≥ 8', bonus: 4, difficulty: 'normal', check: (c) => c.reduce((s, x) => s + x.value, 0) >= 8 },
+    { id: 'n5', description: 'Contiene un 1, un 2 y un 3', bonus: 4, difficulty: 'normal', check: (c) => [1, 2, 3].every(v => c.some(x => x.value === v)) },
+    // HARD (+7)
+    { id: 'h1', description: 'Todos los valores iguales', bonus: 7, difficulty: 'hard', check: (c) => c.length >= 3 && new Set(c.map(x => x.value)).size === 1 },
+    { id: 'h2', description: 'Combo de 5+ cartas', bonus: 7, difficulty: 'hard', check: (c) => c.length >= 5 },
+    {
+        id: 'h3', description: 'Escalera: 1→2→3', bonus: 7, difficulty: 'hard', check: (c) => {
+            const vals = c.map(x => x.value);
+            for (let i = 0; i <= vals.length - 3; i++) { if (vals[i] === 1 && vals[i + 1] === 2 && vals[i + 2] === 3) return true; }
+            return false;
+        }
+    },
+    { id: 'h4', description: 'Suma de valores ≥ 12', bonus: 7, difficulty: 'hard', check: (c) => c.reduce((s, x) => s + x.value, 0) >= 12 },
+    { id: 'h5', description: 'Exactamente 3 treses', bonus: 7, difficulty: 'hard', check: (c) => c.filter(x => x.value === 3).length >= 3 },
 ];
 
 function shuffle(array) {
@@ -64,8 +81,13 @@ function createDeck() {
     return shuffle(cards);
 }
 
+// Weighted random: easy 3x, normal 2x, hard 1x
 function randomPref() {
-    return PREFERENCES[Math.floor(Math.random() * PREFERENCES.length)];
+    const weights = { easy: 3, normal: 2, hard: 1 };
+    const pool = [];
+    PREFERENCES.forEach(p => { for (let i = 0; i < weights[p.difficulty]; i++) pool.push(p); });
+    const chosen = pool[Math.floor(Math.random() * pool.length)];
+    return { id: chosen.id, description: chosen.description, bonus: chosen.bonus, difficulty: chosen.difficulty };
 }
 
 function isValidMove(combo, card) {
@@ -76,9 +98,10 @@ function isValidMove(combo, card) {
     return card.value >= last.value;
 }
 
-function calcComboScore(combo, metObjective) {
-    const base = combo.reduce((sum, _, idx) => sum + (idx + 1), 0);
-    return base + (metObjective ? OBJECTIVE_BONUS : 0);
+// SCORING: sum of all card values + bonus
+function calcComboScore(combo, metObjective, bonusAmount) {
+    const base = combo.reduce((sum, c) => sum + c.value, 0);
+    return base + (metObjective ? bonusAmount : 0);
 }
 
 function reshuffleDeck(state) {
@@ -106,7 +129,7 @@ function advanceRound(state) {
     state.communityCombo = [];
     state.players.forEach(p => {
         const pref = randomPref();
-        p.preference = { id: pref.id, description: pref.description };
+        p.preference = pref;
     });
 }
 
@@ -122,18 +145,21 @@ function playCard(state, cardIndex) {
         const combo = [...state.communityCombo, card];
         const pref = PREFERENCES.find(p => p.id === cp.preference.id);
         const met = pref ? pref.check(combo) : false;
-        const pts = calcComboScore(combo, met);
+        const bonus = pref ? pref.bonus : 3;
+        const pts = calcComboScore(combo, met, bonus);
         cp.score += pts;
         cp.closedChains.push(combo);
-        state.log.push(`🏆 ${cp.name} cerró el combo (${combo.length} cartas) = ${pts} pts!`);
-        if (met) state.log.push(`✨ ¡Bonus objetivo: +${OBJECTIVE_BONUS} pts!`);
+
+        const valuesStr = combo.map(c => c.value).join('+');
+        const valuesSum = combo.reduce((s, c) => s + c.value, 0);
+        state.log.push(`🏆 ${cp.name} cerró (${valuesStr} = ${valuesSum}${met ? ` +${bonus} bonus` : ''}) = ${pts} pts!`);
+
         drawCards(cp, state, DRAW_ON_CLOSE);
         if (cp.score >= WIN_SCORE) {
             state.winner = cp.id;
             state.log.push(`🏆 ¡${cp.name} GANA con ${cp.score} pts!`);
             return state;
         }
-        // COMBO CLOSE = IMMEDIATE NEW ROUND
         advanceRound(state);
     } else {
         state.communityCombo.push(card);
@@ -184,7 +210,7 @@ function passTurn(state) {
     return state;
 }
 
-// ===== AI LOGIC (community combo aware) =====
+// ===== AI LOGIC =====
 function aiBestMove(state, difficulty = 'normal') {
     const ai = state.players[state.currentPlayerIndex];
     const combo = state.communityCombo;
@@ -205,7 +231,8 @@ function aiBestMove(state, difficulty = 'normal') {
             const pc = [...combo, card];
             const pref = PREFERENCES.find(p => p.id === ai.preference.id);
             const met = pref ? pref.check(pc) : false;
-            const pts = calcComboScore(pc, met);
+            const bonus = pref ? pref.bonus : 3;
+            const pts = calcComboScore(pc, met, bonus);
             if (ai.score + pts >= WIN_SCORE) return idx;
         }
     }
@@ -221,7 +248,8 @@ function aiBestMove(state, difficulty = 'normal') {
             const pc = [...combo, card];
             const pref = PREFERENCES.find(p => p.id === ai.preference.id);
             const met = pref ? pref.check(pc) : false;
-            const pts = calcComboScore(pc, met);
+            const bonus = pref ? pref.bonus : 3;
+            const pts = calcComboScore(pc, met, bonus);
             if (combo.length >= 4) s += isExperta ? 80 : 50;
             else if (combo.length >= 3) s += isExperta ? 55 : 35;
             else if (combo.length >= 2) s += 20;
@@ -279,7 +307,7 @@ function createGameState(room) {
             name: p.name,
             isAI: false,
             hand: deck.splice(0, HAND_SIZE),
-            preference: { id: pref.id, description: pref.description },
+            preference: pref,
             score: 0,
             closedChains: []
         });
@@ -293,7 +321,7 @@ function createGameState(room) {
             name: `IA ${aiNames[i]}`,
             isAI: true,
             hand: deck.splice(0, HAND_SIZE),
-            preference: { id: pref.id, description: pref.description },
+            preference: pref,
             score: 0,
             closedChains: []
         });
@@ -328,7 +356,6 @@ function runAITurns(room) {
     if (!cp.isAI) return;
 
     setTimeout(() => {
-        // AI must discard first if hand > HAND_SIZE
         if (state.mustDiscard && cp.hand.length > HAND_SIZE) {
             const worst = cp.hand.reduce((best, c, i) => c.value < cp.hand[best].value ? i : best, 0);
             discardCard(state, worst);
@@ -422,7 +449,6 @@ io.on('connection', (socket) => {
         const cp = room.state.players[room.state.currentPlayerIndex];
         if (cp.id !== socket.playerId) return;
 
-        // If must discard, treat play-card as discard
         if (room.state.mustDiscard) {
             discardCard(room.state, cardIndex);
         } else {
@@ -437,7 +463,7 @@ io.on('connection', (socket) => {
         if (!room || !room.state || room.state.winner) return;
         const cp = room.state.players[room.state.currentPlayerIndex];
         if (cp.id !== socket.playerId) return;
-        if (room.state.mustDiscard) return; // Can't pass while must discard
+        if (room.state.mustDiscard) return;
         passTurn(room.state);
         broadcastState(room);
         runAITurns(room);
