@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { APP_VERSION } from '../config';
 import type { AIDifficulty } from '../logic/ai';
 
 interface MainMenuProps {
@@ -34,7 +35,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStartGame, onGoOnline }) => {
                     Combo Builder
                 </p>
                 <p style={{ fontSize: '12px', opacity: 0.4, marginTop: '4px' }}>
-                    v4.0 — Multijugador · IA con niveles · Combos visibles
+                    {APP_VERSION} — Multijugador · IA con niveles · Combos visibles
                 </p>
             </div>
 
