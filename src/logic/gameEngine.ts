@@ -20,17 +20,14 @@ export const createDeck = (): Card[] => {
     addCards('EXTENSION', 50);
     addCards('END', 25);
 
-    // 5 Tombola cards (Value 5)
-    for (let i = 0; i < 5; i++) {
-        cards.push({ id: `card-${idCounter++}`, type: 'TOMBOLA', value: 3 }); // Value 3 arbitrary? User says worth 5pts.
-        // The value property in Card interface is 1|2|3.
-        // Accessing value 5 might break types.
-        // I should update Card interface to allow value 5? Or just add bonus in scoring.
-        // I'll keep value 3 for compatibility with >= checks?
-        // Tombola cuts. It doesn't need to match value?
-        // User: "se debe comenzar de nuevo en la misma linea".
-        // It effectively resets.
-        // I'll set value 3. And scoring logic will handle the 5 points manually.
+    // 3 Tombola cards (Value 5, but special scoring logic)
+    for (let i = 0; i < 3; i++) {
+        cards.push({ id: `card-${idCounter++}`, type: 'TOMBOLA', value: 3 });
+    }
+
+    // 2 Wildcards (Comodines) - Value 1 (bridge)
+    for (let i = 0; i < 2; i++) {
+        cards.push({ id: `card-${idCounter++}`, type: 'WILDCARD', value: 1 });
     }
 
     return shuffle(cards);
@@ -92,19 +89,22 @@ export function randomPreference(): Preference {
 // Validate against the COMMUNITY combo
 export const isValidMove = (communityCombo: Card[], card: Card): boolean => {
     if (card.type === 'TOMBOLA') return communityCombo.length > 0; // Cut ONLY if there's something to cut
+    if (card.type === 'WILDCARD') return communityCombo.length > 0; // Wildcard needs a base
 
     if (communityCombo.length === 0) return card.type === 'START';
     if (card.type === 'START') return false;
     if (card.type === 'END') return communityCombo.length > 0;
 
     const lastCard = communityCombo[communityCombo.length - 1];
+    if (lastCard.type === 'WILDCARD') return true; // Anything can follow a Wildcard
+
     return card.value >= lastCard.value;
 };
 
 // SCORING: sum of all card values in the combo (including END) + objective bonus
 // SCORING: sum of all card values + Tombola value (5) + objective bonus
 export const calculateComboScore = (combo: Card[], metObjective: boolean, bonusAmount: number): number => {
-    const baseScore = combo.reduce((sum, card) => sum + (card.type === 'TOMBOLA' ? 5 : card.value), 0);
+    const baseScore = combo.reduce((sum, card) => sum + (card.type === 'TOMBOLA' ? 5 : card.type === 'WILDCARD' ? 1 : card.value), 0);
     return baseScore + (metObjective ? bonusAmount : 0);
 };
 

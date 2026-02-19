@@ -210,6 +210,17 @@ const GameBoard: React.FC<GameBoardProps> = ({
                         ))}
                     </div>
 
+                    <div style={{ flex: 1, background: 'rgba(0,0,0,0.4)', padding: '8px', borderRadius: '8px', fontSize: '10px', overflowY: 'auto', display: 'flex', flexDirection: 'column-reverse' }}>
+                        <div style={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '11px', color: '#aaa', position: 'sticky', top: 0 }}>📜 Historial</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            {gameState.log.slice().reverse().map((msg, i) => (
+                                <div key={i} style={{ padding: '2px', borderBottom: '1px solid rgba(255,255,255,0.05)', color: msg.includes('🏆') ? '#FFD700' : msg.includes('✨') ? '#E040FB' : '#ccc' }}>
+                                    {msg}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
                     {isMyTurn && (
                         <button onClick={handlePass} style={{ padding: '8px', background: '#FFD700', color: '#000', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}>
                             PASAR TURNO

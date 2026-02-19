@@ -1,4 +1,4 @@
-export type CardType = 'START' | 'EXTENSION' | 'END' | 'TOMBOLA';
+export type CardType = 'START' | 'EXTENSION' | 'END' | 'TOMBOLA' | 'WILDCARD';
 
 export interface Card {
     id: string;

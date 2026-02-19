@@ -75,9 +75,14 @@ function createDeck() {
     addCards('EXTENSION', 50);
     addCards('END', 25);
 
-    // 5 TOMBOLA (Value 5)
-    for (let i = 0; i < 5; i++) {
+    // 3 TOMBOLA (Value 5)
+    for (let i = 0; i < 3; i++) {
         cards.push({ id: `card-${id++}`, type: 'TOMBOLA', value: 3 });
+    }
+
+    // 2 WILDCARD (Value 1 Bridge)
+    for (let i = 0; i < 2; i++) {
+        cards.push({ id: `card-${id++}`, type: 'WILDCARD', value: 1 });
     }
 
     return shuffle(cards);
@@ -94,16 +99,21 @@ function randomPref() {
 
 function isValidMove(combo, card) {
     if (card.type === 'TOMBOLA') return combo.length > 0;
+    if (card.type === 'WILDCARD') return combo.length > 0;
+
     if (combo.length === 0) return card.type === 'START';
     if (card.type === 'START') return false;
     if (card.type === 'END') return combo.length > 0;
+
     const last = combo[combo.length - 1];
+    if (last.type === 'WILDCARD') return true;
+
     return card.value >= last.value;
 }
 
-// SCORING: sum of all card values + Tombola(5) + bonus
+// SCORING: sum of all card values + Tombola(5) + Wildcard(1) + bonus
 function calcComboScore(combo, metObjective, bonusAmount) {
-    const base = combo.reduce((sum, c) => sum + (c.type === 'TOMBOLA' ? 5 : c.value), 0);
+    const base = combo.reduce((sum, c) => sum + (c.type === 'TOMBOLA' ? 5 : c.type === 'WILDCARD' ? 1 : c.value), 0);
     return base + (metObjective ? bonusAmount : 0);
 }
 
@@ -187,8 +197,18 @@ function playCard(state, cardIndex) {
         state.accumulatedCards = [];
         state.communityCombo = [];
 
-        const valuesStr = totalChain.map(c => c.type === 'TOMBOLA' ? '★' : c.value).join('+');
-        state.log.push(`🏆 ${cp.name} cerró (${valuesStr}${met ? ` +${bonus} bonus` : ''}) = ${pts} pts!`);
+        // Explicit Logging
+        const cardValues = totalChain.map(c => {
+            if (c.type === 'TOMBOLA') return '★(5)';
+            if (c.type === 'WILDCARD') return '🃏(1)';
+            return `${c.value}`;
+        }).join('+');
+
+        const sumVal = totalChain.reduce((s, c) => s + (c.type === 'TOMBOLA' ? 5 : c.type === 'WILDCARD' ? 1 : c.value), 0);
+        const bonusStr = met ? ` + Bonus(${pref.description} = ${bonus})` : '';
+        const totalStr = `${pts}`;
+
+        state.log.push(`🏆 ${cp.name} cerró: [${cardValues}] = ${sumVal}${bonusStr} ⇒ TOTAL ${totalStr} pts!`);
 
         // Refill to HAND_SIZE (5)
         const toDraw = Math.max(0, HAND_SIZE - cp.hand.length);
@@ -202,7 +222,8 @@ function playCard(state, cardIndex) {
         advanceRound(state);
     } else {
         state.communityCombo.push(card);
-        state.log.push(`${cp.name} +${card.type}(${card.value}) → combo: ${state.communityCombo.length} cartas`);
+        const symbol = card.type === 'WILDCARD' ? '🃏' : card.type === 'TOMBOLA' ? '★' : card.value;
+        state.log.push(`${cp.name} +${card.type}(${symbol}) → combo: ${state.communityCombo.length} cartas`);
         // Refill to HAND_SIZE (5)
         const toDraw = Math.max(0, HAND_SIZE - cp.hand.length);
 

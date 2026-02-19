@@ -14,7 +14,8 @@ const Card: React.FC<CardProps> = ({ card, onClick, disabled, isPlayable, small 
     if (card.type === 'START') borderColor = '#2196F3';
     if (card.type === 'EXTENSION') borderColor = '#FF9800';
     if (card.type === 'END') borderColor = '#F44336';
-    if (card.type === 'TOMBOLA') borderColor = '#9C27B0'; // Purple for Tombola
+    if (card.type === 'TOMBOLA') borderColor = '#9C27B0';
+    if (card.type === 'WILDCARD') borderColor = '#E91E63';
 
     const canClick = !disabled && isPlayable;
 
@@ -39,7 +40,9 @@ const Card: React.FC<CardProps> = ({ card, onClick, disabled, isPlayable, small 
                     ? '#e0e0e0'
                     : card.type === 'TOMBOLA'
                         ? 'linear-gradient(135deg, #fff 0%, #ffd700 50%, #fff 100%)' // Shiny Gold
-                        : canClick ? '#fffef0' : 'white',
+                        : card.type === 'WILDCARD'
+                            ? 'linear-gradient(135deg, #FFEB3B 0%, #00BCD4 100%)'
+                            : canClick ? '#fffef0' : 'white',
                 border: finalBorder,
                 borderRadius: small ? '4px' : '8px',
                 display: 'flex',
@@ -56,15 +59,15 @@ const Card: React.FC<CardProps> = ({ card, onClick, disabled, isPlayable, small 
             onMouseEnter={(e) => canClick && (e.currentTarget.style.transform = 'translateY(-15px) scale(1.1)')}
             onMouseLeave={(e) => canClick && (e.currentTarget.style.transform = 'translateY(0) scale(1.05)')}
         >
-            <div style={{ fontSize: small ? '14px' : '28px', fontWeight: 'bold', color: '#000' }}>
-                {card.value}
+            <div style={{ fontSize: small ? '10px' : card.type === 'TOMBOLA' ? '16px' : '28px', fontWeight: 'bold', color: '#000' }}>
+                {card.type === 'TOMBOLA' ? '5 pts' : card.type === 'WILDCARD' ? '🃏' : card.value}
             </div>
             <div style={{ fontSize: small ? '7px' : '10px', fontWeight: 'bold', color: borderColor, textAlign: 'center' }}>
                 {card.type}
             </div>
             {!small && (
-                <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#000', transform: 'rotate(180deg)' }}>
-                    {card.value}
+                <div style={{ fontSize: card.type === 'TOMBOLA' ? '16px' : '28px', fontWeight: 'bold', color: '#000', transform: 'rotate(180deg)' }}>
+                    {card.type === 'TOMBOLA' ? '5 pts' : card.type === 'WILDCARD' ? '🃏' : card.value}
                 </div>
             )}
         </div>
