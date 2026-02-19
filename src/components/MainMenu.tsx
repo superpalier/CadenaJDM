@@ -153,6 +153,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStartGame, onGoOnline }) => {
             >
                 🌐 ONLINE
             </button>
+            <div style={{ marginTop: '20px', fontSize: '12px', opacity: 0.5, color: '#aaa' }}>v2.1 (Refill Logic)</div>
         </div>
     );
 };
