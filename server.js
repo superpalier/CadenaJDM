@@ -65,7 +65,7 @@ function createDeck() {
     const values = [1, 2, 3];
     const typeCounts = [
         { type: 'START', count: 12 },
-        { type: 'EXTENSION', count: 30 },
+        { type: 'EXTENSION', count: 20 },
         { type: 'END', count: 12 },
     ];
     let id = 0;
@@ -135,7 +135,12 @@ function playCard(state, cardIndex) {
     const cp = state.players[state.currentPlayerIndex];
     const card = cp.hand[cardIndex];
     if (!card) return state;
-    if (!isValidMove(state.communityCombo, card)) return state;
+
+    // Debug log
+    const isValid = isValidMove(state.communityCombo, card);
+    console.log(`[PLAY] ${cp.name} tries ${card.type}(${card.value}). Valid? ${isValid}. Combo len: ${state.communityCombo.length}`);
+
+    if (!isValid) return state;
 
     cp.hand.splice(cardIndex, 1);
 

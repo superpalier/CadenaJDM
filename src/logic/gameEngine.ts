@@ -9,7 +9,7 @@ export const createDeck = (): Card[] => {
     const values: (1 | 2 | 3)[] = [1, 2, 3];
     const typeCounts: { type: CardType; count: number }[] = [
         { type: 'START', count: 12 },
-        { type: 'EXTENSION', count: 30 },
+        { type: 'EXTENSION', count: 20 },
         { type: 'END', count: 12 },
     ];
     let idCounter = 0;
