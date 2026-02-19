@@ -401,86 +401,117 @@ io.on('connection', (socket) => {
     console.log(`✅ Connected: ${socket.id}`);
 
     socket.on('create-room', ({ playerName }, callback) => {
-        const code = generateCode();
-        const playerId = `player-${socket.id}`;
-        rooms.set(code, {
-            players: [{ socketId: socket.id, playerId, name: playerName || 'Host' }],
-            host: socket.id, state: null, difficulty: 'normal', aiCount: 0
-        });
-        socket.join(code);
-        socket.roomCode = code;
-        socket.playerId = playerId;
-        console.log(`🏠 Room ${code} created by ${playerName}`);
-        callback({ code, playerId, players: rooms.get(code).players.map(p => ({ name: p.name, id: p.playerId })) });
+        try {
+            const code = generateCode();
+            const playerId = `player-${socket.id}`;
+            rooms.set(code, {
+                players: [{ socketId: socket.id, playerId, name: playerName || 'Host' }],
+                host: socket.id, state: null, difficulty: 'normal', aiCount: 0
+            });
+            socket.join(code);
+            socket.roomCode = code;
+            socket.playerId = playerId;
+            console.log(`🏠 Room ${code} created by ${playerName}`);
+            callback({ code, playerId, players: rooms.get(code).players.map(p => ({ name: p.name, id: p.playerId })) });
+        } catch (error) {
+            console.error('CRITICAL ERROR in create-room:', error);
+            if (typeof callback === 'function') callback({ error: 'Server error creating room' });
+        }
     });
 
     socket.on('join-room', ({ code, playerName }, callback) => {
-        const room = rooms.get(code?.toUpperCase());
-        if (!room) return callback({ error: 'Sala no encontrada' });
-        if (room.state) return callback({ error: 'Juego ya iniciado' });
-        if (room.players.length >= 5) return callback({ error: 'Sala llena (máx 5)' });
+        try {
+            const room = rooms.get(code?.toUpperCase());
+            if (!room) return callback({ error: 'Sala no encontrada' });
+            if (room.state) return callback({ error: 'Juego ya iniciado' });
+            if (room.players.length >= 5) return callback({ error: 'Sala llena (máx 5)' });
 
-        const playerId = `player-${socket.id}`;
-        room.players.push({ socketId: socket.id, playerId, name: playerName || `Player ${room.players.length + 1}` });
-        socket.join(code.toUpperCase());
-        socket.roomCode = code.toUpperCase();
-        socket.playerId = playerId;
+            const playerId = `player-${socket.id}`;
+            room.players.push({ socketId: socket.id, playerId, name: playerName || `Player ${room.players.length + 1}` });
+            socket.join(code.toUpperCase());
+            socket.roomCode = code.toUpperCase();
+            socket.playerId = playerId;
 
-        const playerList = room.players.map(p => ({ name: p.name, id: p.playerId }));
-        io.to(code.toUpperCase()).emit('room-update', { players: playerList, aiCount: room.aiCount });
-        console.log(`👤 ${playerName} joined room ${code}`);
-        callback({ playerId, players: playerList });
+            const playerList = room.players.map(p => ({ name: p.name, id: p.playerId }));
+            io.to(code.toUpperCase()).emit('room-update', { players: playerList, aiCount: room.aiCount });
+            console.log(`👤 ${playerName} joined room ${code}`);
+            callback({ playerId, players: playerList });
+        } catch (error) {
+            console.error('CRITICAL ERROR in join-room:', error);
+            if (typeof callback === 'function') callback({ error: 'Server error joining room' });
+        }
     });
 
     socket.on('set-ai-count', ({ count }) => {
-        const room = rooms.get(socket.roomCode);
-        if (!room || room.host !== socket.id) return;
-        room.aiCount = Math.max(0, Math.min(4 - room.players.length, count));
-        const playerList = room.players.map(p => ({ name: p.name, id: p.playerId }));
-        io.to(socket.roomCode).emit('room-update', { players: playerList, aiCount: room.aiCount });
+        try {
+            const room = rooms.get(socket.roomCode);
+            if (!room || room.host !== socket.id) return;
+            room.aiCount = Math.max(0, Math.min(4 - room.players.length, count));
+            const playerList = room.players.map(p => ({ name: p.name, id: p.playerId }));
+            io.to(socket.roomCode).emit('room-update', { players: playerList, aiCount: room.aiCount });
+        } catch (error) {
+            console.error('CRITICAL ERROR in set-ai-count:', error);
+        }
     });
 
     socket.on('set-difficulty', ({ difficulty }) => {
-        const room = rooms.get(socket.roomCode);
-        if (!room || room.host !== socket.id) return;
-        room.difficulty = difficulty;
-        io.to(socket.roomCode).emit('difficulty-update', { difficulty });
+        try {
+            const room = rooms.get(socket.roomCode);
+            if (!room || room.host !== socket.id) return;
+            room.difficulty = difficulty;
+            io.to(socket.roomCode).emit('difficulty-update', { difficulty });
+        } catch (error) {
+            console.error('CRITICAL ERROR in set-difficulty:', error);
+        }
     });
 
     socket.on('start-game', () => {
-        const room = rooms.get(socket.roomCode);
-        if (!room || room.host !== socket.id) return;
-        if (room.players.length + room.aiCount < 2) return;
-        room.state = createGameState(room);
-        console.log(`🎮 Game started in room ${socket.roomCode}`);
-        broadcastState(room);
-        runAITurns(room);
+        try {
+            const room = rooms.get(socket.roomCode);
+            if (!room || room.host !== socket.id) return;
+            if (room.state) return; // Prevent restarting active game
+            if (room.players.length + room.aiCount < 2) return;
+            room.state = createGameState(room);
+            console.log(`🎮 Game started in room ${socket.roomCode}`);
+            broadcastState(room);
+            runAITurns(room);
+        } catch (error) {
+            console.error('CRITICAL ERROR in start-game:', error);
+        }
     });
 
     socket.on('play-card', ({ cardIndex }) => {
-        const room = rooms.get(socket.roomCode);
-        if (!room || !room.state || room.state.winner) return;
-        const cp = room.state.players[room.state.currentPlayerIndex];
-        if (cp.id !== socket.playerId) return;
+        try {
+            const room = rooms.get(socket.roomCode);
+            if (!room || !room.state || room.state.winner) return;
+            const cp = room.state.players[room.state.currentPlayerIndex];
+            if (cp.id !== socket.playerId) return;
 
-        if (room.state.mustDiscard) {
-            discardCard(room.state, cardIndex);
-        } else {
-            playCard(room.state, cardIndex);
+            if (room.state.mustDiscard) {
+                discardCard(room.state, cardIndex);
+            } else {
+                playCard(room.state, cardIndex);
+            }
+            broadcastState(room);
+            runAITurns(room);
+        } catch (error) {
+            console.error('CRITICAL ERROR in play-card:', error);
         }
-        broadcastState(room);
-        runAITurns(room);
     });
 
     socket.on('pass-turn', () => {
-        const room = rooms.get(socket.roomCode);
-        if (!room || !room.state || room.state.winner) return;
-        const cp = room.state.players[room.state.currentPlayerIndex];
-        if (cp.id !== socket.playerId) return;
-        if (room.state.mustDiscard) return;
-        passTurn(room.state);
-        broadcastState(room);
-        runAITurns(room);
+        try {
+            const room = rooms.get(socket.roomCode);
+            if (!room || !room.state || room.state.winner) return;
+            const cp = room.state.players[room.state.currentPlayerIndex];
+            if (cp.id !== socket.playerId) return;
+            if (room.state.mustDiscard) return;
+            passTurn(room.state);
+            broadcastState(room);
+            runAITurns(room);
+        } catch (error) {
+            console.error('CRITICAL ERROR in pass-turn:', error);
+        }
     });
 
     socket.on('disconnect', () => {
